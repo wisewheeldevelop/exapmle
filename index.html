@@ -29,6 +29,7 @@
     position:relative;
     width:100%;
     min-height:100vh;
+    min-height:100dvh;        /* mobile browser chrome aware */
     overflow:hidden;
     background:#000;
   }
@@ -67,13 +68,13 @@
   /* ---------- NAV ---------- */
   nav{
     position:absolute;top:0;left:0;right:0;z-index:20;
-    display:flex;align-items:center;justify-content:space-between;
-    padding:28px clamp(24px,5vw,72px);
+    display:flex;align-items:center;justify-content:space-between;gap:14px;
+    padding:clamp(18px,3.5vw,28px) clamp(18px,5vw,72px);
   }
   .brand{
     display:flex;align-items:center;gap:12px;
-    font-weight:800;letter-spacing:.3em;font-size:20px;
-    text-transform:uppercase;
+    font-weight:800;letter-spacing:.3em;font-size:clamp(15px,2.4vw,20px);
+    text-transform:uppercase;white-space:nowrap;
   }
   .brand-txt{direction:ltr;unicode-bidi:isolate}
   .brand{color:#fff}
@@ -104,10 +105,11 @@
     position:relative;z-index:10;
     direction:ltr;            /* keep product on the left, copy on the right (matches reference) */
     min-height:100vh;
+    min-height:100dvh;
     display:grid;
     grid-template-columns:1.05fr .95fr;
     align-items:center;
-    padding:0 clamp(24px,5vw,72px);
+    padding:0 clamp(20px,5vw,72px);
     gap:20px;
   }
 
@@ -164,9 +166,10 @@
   .eyebrow::before{content:"";width:34px;height:1px;background:linear-gradient(270deg,var(--gold),transparent)}
   h1{
     font-family:"Rubik","Heebo",sans-serif;
-    font-size:clamp(44px,6.4vw,92px);
-    line-height:.98;font-weight:900;letter-spacing:-.01em;
+    font-size:clamp(33px,8.5vw,92px);
+    line-height:1.0;font-weight:900;letter-spacing:-.01em;
     margin-bottom:24px;color:#fff;
+    overflow-wrap:break-word;
   }
   h1 .shine{
     background:linear-gradient(110deg,#fff 10%,var(--gold-bright) 38%,var(--gold) 50%,#7a5c00 68%,#fff 92%);
@@ -228,15 +231,68 @@
   @keyframes wheel{0%{opacity:0;top:7px}40%{opacity:1}100%{opacity:0;top:18px}}
 
   /* ---------- RESPONSIVE ---------- */
+  /* tablet & down: stack product over copy, centered */
   @media (max-width:900px){
-    .stage{grid-template-columns:1fr;text-align:center;padding-top:120px;gap:10px}
-    .product{justify-self:center}
-    .product img{width:min(80vw,460px)}
-    .copy{justify-self:center;text-align:center}
+    .links{display:none}
+    .stage{
+      grid-template-columns:1fr;
+      text-align:center;
+      padding-top:96px;padding-bottom:64px;
+      gap:8px;
+    }
+    .product{justify-self:center;margin-top:24px}
+    .product img{width:min(78vw,440px)}
+    .copy{justify-self:center;text-align:center;max-width:600px}
     .eyebrow{justify-content:center}
     .actions{justify-content:center}
     .stats{justify-content:center}
-    .links{display:none}
+    .product::after{display:none}   /* drop CSS reflection when centered */
+  }
+
+  /* phones */
+  @media (max-width:560px){
+    nav{padding:16px 18px}
+    .nav-cta{padding:9px 16px;font-size:11px;letter-spacing:.12em}
+    .brand{letter-spacing:.18em;gap:9px}
+    .stage{padding-top:88px;padding-bottom:54px}
+    .product{margin-top:18px}
+    .product img{width:86vw}
+    p.lead{font-size:15px;max-width:none}
+    .actions{gap:12px}
+    .btn-primary{padding:16px 26px;font-size:13px;flex:1 1 auto;text-align:center}
+    .btn-ghost{font-size:13px}
+    /* stats: even 3-up row that never overflows */
+    .stats{
+      gap:0;margin-top:38px;padding-top:20px;
+      width:100%;justify-content:space-between;
+    }
+    .stat{flex:1;text-align:center}
+    .stat .num{font-size:clamp(20px,6vw,28px)}
+    .stat .lbl{letter-spacing:.12em;font-size:10px}
+    .scroll{display:none}
+  }
+
+  /* very small phones */
+  @media (max-width:360px){
+    .nav-cta{padding:8px 12px;font-size:10px}
+    .brand{font-size:14px;letter-spacing:.12em}
+    .stat .lbl{font-size:9px}
+  }
+
+  /* short landscape: don't force full-height cramming */
+  @media (max-height:560px) and (orientation:landscape){
+    .hero,.stage{min-height:auto}
+    .stage{padding-top:84px;padding-bottom:48px}
+    .scroll{display:none}
+  }
+
+  /* accessibility: honour reduced-motion */
+  @media (prefers-reduced-motion:reduce){
+    .product img{animation:none}
+    h1 .shine{animation:none}
+    .scroll .mouse::after{animation:none}
+    .cat{transition:box-shadow .3s, background .3s}
+    *{scroll-behavior:auto}
   }
 
   /* =========================================================
@@ -344,10 +400,18 @@
   .cat .go .arr{display:inline-block;transition:transform .3s}
   .cat:hover .go .arr{transform:translateX(-4px)}
 
-  @media (max-width:1000px){ .cats-grid{grid-template-columns:repeat(2,1fr)} }
+  @media (max-width:1000px){
+    .cats-grid{grid-template-columns:repeat(2,1fr);gap:16px}
+    .cats-head{margin-bottom:40px}
+  }
   @media (max-width:560px){
-    .cats-grid{grid-template-columns:1fr}
-    .cat{min-height:auto}
+    .cats{padding:64px 18px 80px}
+    .cats-head h2{font-size:clamp(26px,7vw,40px)}
+    .cats-head p{max-width:none}
+    .cats-grid{grid-template-columns:1fr;gap:14px}
+    .cat{min-height:auto;padding:20px 22px 24px}
+    .cat-img{height:200px}
+    .cat-img img{max-height:180px}
   }
 </style>
 </head>
@@ -694,7 +758,9 @@
   });
 
   function resize(){
-    const dpr = Math.min(window.devicePixelRatio||1, 1.75);
+    // lower the render resolution on phones to save battery / keep 60fps
+    const cap = window.innerWidth < 700 ? 1.25 : 1.75;
+    const dpr = Math.min(window.devicePixelRatio||1, cap);
     canvas.width  = Math.floor(window.innerWidth*dpr);
     canvas.height = Math.floor(window.innerHeight*dpr);
     canvas.style.width = window.innerWidth+'px';
