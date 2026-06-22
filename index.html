@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CASABIKE · אופניים וקורקינטים חשמליים</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800&family=Rubik:wght@500;700;800;900&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --gold:#f5c518;
+    --gold-bright:#ffe14d;
+    --gold-deep:#b8860b;
+    --ink:#15151c;
+    --muted:#5c5c68;
+    --paper:#faf8f3;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;background:var(--paper);overflow-x:hidden}
+  body{
+    font-family:"Heebo","Segoe UI",-apple-system,Helvetica,Arial,sans-serif;
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---------- HERO SHELL (dark) ---------- */
+  .hero{
+    position:relative;
+    width:100%;
+    min-height:100vh;
+    overflow:hidden;
+    background:#000;
+  }
+
+  /* WebGL shader canvas (animated black-gold marble + lightning) */
+  #fx{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    display:block;
+    z-index:1;
+  }
+
+  /* cinematic grade on top of the shader (dark) */
+  .grade{
+    position:absolute;
+    inset:0;
+    z-index:2;
+    pointer-events:none;
+    background:
+      radial-gradient(120% 90% at 18% 42%, rgba(245,197,24,.14), transparent 55%),
+      radial-gradient(150% 120% at 85% 60%, rgba(0,0,0,.65), transparent 60%),
+      linear-gradient(180deg, rgba(0,0,0,.55) 0%, transparent 22%, transparent 58%, #000 100%);
+    mix-blend-mode:normal;
+  }
+  .vignette{
+    position:absolute;inset:0;z-index:3;pointer-events:none;
+    box-shadow:inset 0 0 320px 60px rgba(0,0,0,.92);
+  }
+  .grain{
+    position:absolute;inset:0;z-index:4;pointer-events:none;opacity:.05;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.6'/></svg>");
+  }
+
+  /* ---------- NAV ---------- */
+  nav{
+    position:absolute;top:0;left:0;right:0;z-index:20;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:28px clamp(24px,5vw,72px);
+  }
+  .brand{
+    display:flex;align-items:center;gap:12px;
+    font-weight:800;letter-spacing:.3em;font-size:20px;
+    text-transform:uppercase;
+  }
+  .brand-txt{direction:ltr;unicode-bidi:isolate}
+  .brand{color:#fff}
+  .brand .spark{
+    width:11px;height:11px;border-radius:50%;
+    background:var(--gold-bright);
+    box-shadow:0 0 14px 3px var(--gold),0 0 30px 6px rgba(245,197,24,.6);
+  }
+  .brand b{color:var(--gold)}
+  .links{display:flex;gap:38px;list-style:none}
+  .links a{
+    color:rgba(255,255,255,.78);text-decoration:none;
+    font-size:13px;letter-spacing:.16em;text-transform:uppercase;
+    font-weight:600;transition:color .25s;
+  }
+  .links a:hover{color:var(--gold-bright)}
+  .nav-cta{
+    border:1px solid rgba(245,197,24,.5);
+    color:var(--gold);background:rgba(245,197,24,.06);
+    padding:11px 22px;border-radius:40px;
+    font-size:12px;letter-spacing:.18em;font-weight:700;text-transform:uppercase;
+    cursor:pointer;transition:.25s;
+  }
+  .nav-cta:hover{background:var(--gold);color:#000;box-shadow:0 0 28px rgba(245,197,24,.5)}
+
+  /* ---------- CONTENT GRID ---------- */
+  .stage{
+    position:relative;z-index:10;
+    direction:ltr;            /* keep product on the left, copy on the right (matches reference) */
+    min-height:100vh;
+    display:grid;
+    grid-template-columns:1.05fr .95fr;
+    align-items:center;
+    padding:0 clamp(24px,5vw,72px);
+    gap:20px;
+  }
+
+  /* product image (Layer-11.png) */
+  .product{
+    position:relative;
+    justify-self:start;
+    align-self:center;
+    margin-top:40px;
+  }
+  .product img{
+    width:min(46vw,640px);
+    height:auto;
+    display:block;
+    filter:
+      drop-shadow(0 28px 50px rgba(0,0,0,.85))
+      drop-shadow(0 0 60px rgba(245,197,24,.18));
+    animation:float 7s ease-in-out infinite;
+  }
+  /* reflection of the product on the wet floor */
+  .product::after{
+    content:"";
+    position:absolute;left:6%;right:6%;bottom:-34%;
+    height:34%;
+    background:inherit;
+    background-image:url("Layer-11.png");
+    background-size:cover;background-position:top;
+    transform:scaleY(-1);
+    -webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,.4),transparent 75%);
+            mask-image:linear-gradient(to bottom,rgba(0,0,0,.4),transparent 75%);
+    opacity:.22;filter:blur(3px);
+    pointer-events:none;
+  }
+  .glow-pool{
+    position:absolute;z-index:9;left:0;bottom:6%;
+    width:60%;height:30%;
+    background:radial-gradient(60% 80% at 35% 50%,rgba(245,197,24,.22),transparent 70%);
+    filter:blur(40px);pointer-events:none;
+  }
+
+  @keyframes float{
+    0%,100%{transform:translateY(0)}
+    50%{transform:translateY(-14px)}
+  }
+
+  /* copy */
+  .copy{justify-self:end;max-width:520px;text-align:right;direction:rtl}
+  .eyebrow{
+    display:inline-flex;align-items:center;gap:10px;
+    color:var(--gold);font-size:12px;letter-spacing:.34em;
+    text-transform:uppercase;font-weight:700;margin-bottom:22px;
+  }
+  .eyebrow{color:var(--gold)}
+  .eyebrow::before{content:"";width:34px;height:1px;background:linear-gradient(270deg,var(--gold),transparent)}
+  h1{
+    font-family:"Rubik","Heebo",sans-serif;
+    font-size:clamp(44px,6.4vw,92px);
+    line-height:.98;font-weight:900;letter-spacing:-.01em;
+    margin-bottom:24px;color:#fff;
+  }
+  h1 .shine{
+    background:linear-gradient(110deg,#fff 10%,var(--gold-bright) 38%,var(--gold) 50%,#7a5c00 68%,#fff 92%);
+    background-size:220% auto;
+    -webkit-background-clip:text;background-clip:text;
+    -webkit-text-fill-color:transparent;color:transparent;
+    animation:sheen 6s linear infinite;
+  }
+  @keyframes sheen{to{background-position:220% center}}
+  p.lead{
+    color:rgba(235,235,245,.72);
+    font-size:clamp(15px,1.2vw,18px);
+    line-height:1.6;margin-bottom:38px;max-width:430px;
+  }
+  .actions{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+  .btn-primary{
+    position:relative;border:none;cursor:pointer;
+    background:linear-gradient(135deg,var(--gold-bright),var(--gold-deep));
+    color:#1a1500;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+    font-size:14px;padding:18px 38px;border-radius:50px;
+    box-shadow:0 10px 30px rgba(245,197,24,.35),inset 0 1px 0 rgba(255,255,255,.6);
+    transition:transform .2s,box-shadow .2s;
+  }
+  .btn-primary:hover{transform:translateY(-3px);box-shadow:0 16px 44px rgba(245,197,24,.55)}
+  .btn-ghost{
+    background:none;border:none;cursor:pointer;color:#fff;
+    font-weight:700;letter-spacing:.1em;text-transform:uppercase;font-size:14px;
+    display:flex;align-items:center;gap:12px;
+  }
+  .btn-ghost .play{
+    width:42px;height:42px;border-radius:50%;
+    border:1px solid rgba(245,197,24,.5);
+    display:grid;place-items:center;color:var(--gold);
+    transition:.25s;
+  }
+  .btn-ghost:hover .play{background:var(--gold);color:#000;box-shadow:0 0 24px rgba(245,197,24,.5)}
+
+  .stats{
+    display:flex;gap:42px;margin-top:54px;
+    border-top:1px solid rgba(255,255,255,.08);padding-top:26px;
+  }
+  .stat .num{font-size:30px;font-weight:800;color:#fff}
+  .stat .num span{color:var(--gold)}
+  .stat .lbl{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-top:4px}
+
+  .scroll{
+    position:absolute;left:50%;bottom:26px;transform:translateX(-50%);
+    z-index:15;color:rgba(255,255,255,.5);font-size:11px;letter-spacing:.3em;
+    text-transform:uppercase;display:flex;flex-direction:column;align-items:center;gap:10px;
+  }
+  .scroll .mouse{
+    width:24px;height:38px;border:1px solid rgba(255,255,255,.3);border-radius:14px;position:relative;
+  }
+  .scroll .mouse::after{
+    content:"";position:absolute;top:7px;left:50%;transform:translateX(-50%);
+    width:3px;height:7px;border-radius:2px;background:var(--gold);
+    animation:wheel 1.8s ease-in-out infinite;
+  }
+  @keyframes wheel{0%{opacity:0;top:7px}40%{opacity:1}100%{opacity:0;top:18px}}
+
+  /* ---------- RESPONSIVE ---------- */
+  @media (max-width:900px){
+    .stage{grid-template-columns:1fr;text-align:center;padding-top:120px;gap:10px}
+    .product{justify-self:center}
+    .product img{width:min(80vw,460px)}
+    .copy{justify-self:center;text-align:center}
+    .eyebrow{justify-content:center}
+    .actions{justify-content:center}
+    .stats{justify-content:center}
+    .links{display:none}
+  }
+
+  /* =========================================================
+     CATEGORIES SECTION — premium 2026
+     ========================================================= */
+  .cats{
+    position:relative;
+    background:
+      radial-gradient(120% 80% at 85% -10%, rgba(202,165,61,.10), transparent 55%),
+      radial-gradient(100% 80% at 0% 110%, rgba(202,165,61,.07), transparent 50%),
+      linear-gradient(180deg,var(--paper) 0%, #fbfaf7 40%, #f1ede6 100%);
+    padding:clamp(80px,10vw,140px) clamp(24px,5vw,72px) clamp(90px,9vw,130px);
+    overflow:hidden;
+  }
+  /* soft seam at the top so it blends from the hero */
+  .cats::before{
+    content:"";position:absolute;left:0;right:0;top:0;height:160px;
+    background:linear-gradient(180deg,var(--paper),transparent);
+    pointer-events:none;
+  }
+  .cats-head{
+    max-width:1280px;margin:0 auto 56px;
+    display:flex;align-items:flex-end;justify-content:space-between;gap:30px;flex-wrap:wrap;
+  }
+  .cats-head .eyebrow{margin-bottom:14px}
+  .cats-head h2{
+    font-family:"Rubik","Heebo",sans-serif;color:var(--ink);
+    font-size:clamp(30px,4vw,56px);font-weight:900;line-height:1.04;letter-spacing:-.01em;
+  }
+  .cats-head h2 em{font-style:normal;color:var(--gold-deep)}
+  .cats-head p{color:var(--muted);max-width:360px;font-size:15px;line-height:1.6}
+
+  .cats-grid{
+    max-width:1280px;margin:0 auto;
+    display:grid;grid-template-columns:repeat(4,1fr);gap:22px;
+  }
+
+  .cat{
+    position:relative;
+    border-radius:22px;
+    padding:22px 26px 26px;
+    display:flex;flex-direction:column;
+    background:linear-gradient(160deg, #ffffff, #fcfaf3);
+    overflow:hidden;cursor:pointer;
+    transform:translateY(28px);opacity:0;
+    transition:transform .7s cubic-bezier(.16,.84,.3,1), opacity .7s ease, box-shadow .4s, background .4s;
+    box-shadow:0 16px 38px rgba(60,50,20,.10), inset 0 1px 0 rgba(255,255,255,.9);
+  }
+  .cat.in{transform:translateY(0);opacity:1}
+  /* gradient hairline border */
+  .cat::before{
+    content:"";position:absolute;inset:0;border-radius:22px;padding:1px;
+    background:linear-gradient(160deg, rgba(245,197,24,.7), rgba(60,50,20,.07) 45%, rgba(245,197,24,.15) 100%);
+    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;mask-composite:exclude;
+    pointer-events:none;transition:opacity .4s;opacity:.7;
+  }
+  /* sheen sweep on hover */
+  .cat::after{
+    content:"";position:absolute;top:0;bottom:0;width:60%;
+    left:-80%;
+    background:linear-gradient(100deg,transparent, rgba(245,197,24,.22), transparent);
+    transform:skewX(-18deg);transition:left .8s cubic-bezier(.2,.7,.3,1);
+    pointer-events:none;z-index:3;
+  }
+  .cat:hover{
+    transform:translateY(-8px);
+    background:linear-gradient(160deg, #fffdf5, #fdf4dd);
+    box-shadow:0 28px 56px rgba(60,50,20,.16), 0 0 44px rgba(245,197,24,.22), inset 0 1px 0 rgba(255,255,255,.9);
+  }
+  .cat:hover::before{opacity:1}
+  .cat:hover::after{left:120%}
+
+  .cat .idx{
+    position:absolute;top:16px;left:20px;z-index:2;
+    font-family:"Rubik",sans-serif;font-weight:900;font-size:50px;
+    color:transparent;-webkit-text-stroke:1px rgba(245,197,24,.45);
+    line-height:1;user-select:none;
+  }
+  /* product image area */
+  .cat-img{
+    position:relative;height:180px;margin:0 -6px 14px;border-radius:16px;
+    display:grid;place-items:center;
+    background:radial-gradient(60% 65% at 50% 42%, rgba(245,197,24,.18), rgba(245,197,24,0) 72%);
+  }
+  .cat-img img{
+    max-width:86%;max-height:160px;width:auto;height:auto;object-fit:contain;
+    filter:drop-shadow(0 16px 22px rgba(40,30,0,.24));
+    transition:transform .55s cubic-bezier(.2,.8,.2,1);
+  }
+  .cat:hover .cat-img img{transform:scale(1.07) rotate(-2deg)}
+
+  .cat h3{
+    font-family:"Rubik","Heebo",sans-serif;color:var(--ink);
+    font-size:22px;font-weight:800;margin:0 0 8px;
+  }
+  .cat .desc{color:var(--muted);font-size:14px;line-height:1.55;margin-bottom:18px}
+  .cat .go{
+    display:inline-flex;align-items:center;gap:8px;margin-top:auto;
+    color:var(--gold-deep);font-weight:700;font-size:13px;letter-spacing:.04em;
+    transition:gap .3s,color .3s;
+  }
+  .cat:hover .go{gap:14px;color:#9c6f08}
+  .cat .go .arr{display:inline-block;transition:transform .3s}
+  .cat:hover .go .arr{transform:translateX(-4px)}
+
+  @media (max-width:1000px){ .cats-grid{grid-template-columns:repeat(2,1fr)} }
+  @media (max-width:560px){
+    .cats-grid{grid-template-columns:1fr}
+    .cat{min-height:auto}
+  }
+</style>
+</head>
+<body>
+<section class="hero">
+  <!-- Animated shader background -->
+  <canvas id="fx"></canvas>
+  <div class="grade"></div>
+  <div class="vignette"></div>
+  <div class="grain"></div>
+
+  <!-- Navigation -->
+  <nav>
+    <div class="brand"><span class="spark"></span><span class="brand-txt">CASA <b>BIKE</b></span></div>
+    <ul class="links">
+      <li><a href="#">אופניים חשמליים</a></li>
+      <li><a href="#">קורקינטים</a></li>
+      <li><a href="#">מבצעים</a></li>
+      <li><a href="#">צור קשר</a></li>
+    </ul>
+    <button class="nav-cta">למבצעי החודש »</button>
+  </nav>
+
+  <!-- Hero content -->
+  <div class="stage">
+    <div class="glow-pool"></div>
+    <div class="product">
+      <img src="Layer-11.png" alt="CORR electric bike and scooter" />
+    </div>
+
+    <div class="copy">
+      <span class="eyebrow">Casa Bike</span>
+      <h1><span class="shine">מגוון אופניים<br>והקורקינטים<br>המובילים בישראל</span></h1>
+      <p class="lead">
+        אופניים חשמליים וקורקינטים מתקפלים עם מומנט עוצמתי, אחיזה לכל שטח
+        וסוללה שמחזיקה לאורך כל היום. הכוח שזז יחד איתך.
+      </p>
+      <div class="actions">
+        <button class="btn-primary">למבצעי החודש »</button>
+        <button class="btn-ghost">
+          <span class="play">▶</span> צפו בסרטון
+        </button>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="num">80<span>ק"מ</span></div><div class="lbl">טווח נסיעה</div></div>
+        <div class="stat"><div class="num">45<span>קמ"ש</span></div><div class="lbl">מהירות מרבית</div></div>
+        <div class="stat"><div class="num">2.5<span>שע'</span></div><div class="lbl">טעינה מהירה</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="scroll"><span>גלול</span><span class="mouse"></span></div>
+</section>
+
+<!-- ===================== CATEGORIES ===================== -->
+<section class="cats">
+  <div class="cats-head">
+    <div>
+      <span class="eyebrow">הקטגוריות שלנו</span>
+      <h2>כל מה שצריך<br>כדי <em>לזוז קדימה</em></h2>
+    </div>
+    <p>מבחר הכלים הרחב והאיכותי בישראל — מאופניים קלאסיות ועד קורקינטים חשמליים בעיצוב פרימיום.</p>
+  </div>
+
+  <div class="cats-grid">
+
+    <!-- אופניים רגילות -->
+    <article class="cat">
+      <span class="idx">01</span>
+      <div class="cat-img"><img src="regularbike.png" alt="אופניים רגילות" loading="lazy" /></div>
+      <h3>אופניים רגילות</h3>
+      <p class="desc">רכיבה קלאסית, מסגרות קלות וביצועים אמינים לכל יום בעיר ובשטח.</p>
+      <span class="go">לצפייה במוצרים <span class="arr">«</span></span>
+    </article>
+
+    <!-- אופניים חשמליות -->
+    <article class="cat">
+      <span class="idx">02</span>
+      <div class="cat-img"><img src="electricbike.png" alt="אופניים חשמליות" loading="lazy" /></div>
+      <h3>אופניים חשמליות</h3>
+      <p class="desc">מנוע עוצמתי, סוללה לטווח ארוך ותאוצה חלקה — הדרך החכמה לנוע.</p>
+      <span class="go">לצפייה במוצרים <span class="arr">«</span></span>
+    </article>
+
+    <!-- קורקינטים חשמליים -->
+    <article class="cat">
+      <span class="idx">03</span>
+      <div class="cat-img"><img src="scooter.png" alt="קורקינטים חשמליים" loading="lazy" /></div>
+      <h3>קורקינטים חשמליים</h3>
+      <p class="desc">מתקפלים, קלים וזריזים — ניידות אורבנית מושלמת לקילומטר האחרון.</p>
+      <span class="go">לצפייה במוצרים <span class="arr">«</span></span>
+    </article>
+
+    <!-- אביזרים -->
+    <article class="cat">
+      <span class="idx">04</span>
+      <div class="cat-img"><img src="acc.png" alt="אביזרים" loading="lazy" /></div>
+      <h3>אביזרים</h3>
+      <p class="desc">קסדות, מנעולים, תאורה ותוספות פרימיום — כל מה שישלים את הרכיבה.</p>
+      <span class="go">לצפייה במוצרים <span class="arr">«</span></span>
+    </article>
+
+  </div>
+</section>
+
+<script>
+/* =========================================================
+   WebGL fragment shader — black & gold marble + gold lightning
+   Domain-warped fractal Brownian motion creates the flowing
+   marble veins; animated electric arcs add the lightning;
+   a reflective "wet floor" mirrors the lower half.
+   ========================================================= */
+(function(){
+  const canvas = document.getElementById('fx');
+  const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+  if(!gl){ canvas.style.background = '#080808'; return; }
+
+  const vsrc = `
+    attribute vec2 p;
+    void main(){ gl_Position = vec4(p,0.0,1.0); }
+  `;
+
+  const fsrc = `
+    precision highp float;
+    uniform vec2  u_res;
+    uniform float u_time;
+    uniform vec2  u_mouse;
+
+    // -- hash / value noise --
+    float hash(vec2 p){
+      p = fract(p*vec2(123.34,456.21));
+      p += dot(p,p+45.32);
+      return fract(p.x*p.y);
+    }
+    float noise(vec2 p){
+      vec2 i = floor(p), f = fract(p);
+      vec2 u = f*f*(3.0-2.0*f);
+      float a = hash(i+vec2(0,0));
+      float b = hash(i+vec2(1,0));
+      float c = hash(i+vec2(0,1));
+      float d = hash(i+vec2(1,1));
+      return mix(mix(a,b,u.x),mix(c,d,u.x),u.y);
+    }
+    float fbm(vec2 p){
+      float v = 0.0, a = 0.5;
+      mat2 m = mat2(1.6,1.2,-1.2,1.6);
+      for(int i=0;i<6;i++){
+        v += a*noise(p);
+        p = m*p;
+        a *= 0.5;
+      }
+      return v;
+    }
+
+    // ---------------------------------------------------------
+    //  Realistic lightning
+    // ---------------------------------------------------------
+
+    // Jagged, sharply-kinked horizontal offset of a bolt at height y.
+    // The shape "snaps" to a new silhouette in discrete steps (floor on
+    // time) like a real strike re-igniting, instead of smoothly sliding.
+    float boltPath(float y, float seed, float t){
+      float x = 0.0;
+      float amp = 0.13;
+      float f   = 2.2;
+      float jitter = floor(t*9.0)*0.137;      // discrete re-strike jitter
+      for(int i=0;i<6;i++){
+        float n = noise(vec2(y*f + seed*7.31, jitter + seed*3.0));
+        x += (n*2.0-1.0)*amp;                 // signed kink
+        amp *= 0.52;
+        f   *= 2.07;
+      }
+      return x;
+    }
+
+    // Distance-field glow of one bolt: a hot thin core wrapped in bloom,
+    // tapered so it fades into the ceiling and floor.
+    float boltGlow(vec2 uv, float baseX, float seed, float t, out float core){
+      float path = baseX + boltPath(uv.y, seed, t);
+      float d = abs(uv.x - path);
+      core     = 0.0016 / (d + 0.0011);       // white-hot filament
+      float halo = 0.011 / (d*d*40.0 + 0.05); // soft amber bloom
+      float taper = smoothstep(0.0,0.12,uv.y) * smoothstep(1.0,0.82,uv.y);
+      core *= taper;
+      return (core + halo*0.6) * taper;
+    }
+
+    // Strike envelope — not every cycle fires, and when it does it
+    // flickers a few times rapidly then decays (classic stroboscopic
+    // lightning behaviour).
+    float strike(float seed, float t){
+      float period = 1.9;
+      float ph  = t/period + seed*4.17;
+      float idx = floor(ph);
+      float r   = hash(vec2(idx, seed*9.0));
+      if(r < 0.40) return 0.0;                // many cycles stay dark
+      float local = fract(ph);
+      float decay = exp(-local*6.5);
+      float flick = 0.55 + 0.45*sin(local*55.0 + r*30.0); // multi-flash
+      return max(decay*flick, 0.0);
+    }
+
+    void main(){
+      vec2 uv = gl_FragCoord.xy / u_res.xy;
+      vec2 p  = uv;
+      p.x *= u_res.x / u_res.y;
+
+      float t = u_time*0.05;
+
+      // -- domain warped marble --
+      vec2 q = vec2( fbm(p + vec2(0.0,t)),
+                     fbm(p + vec2(5.2,1.3 - t)) );
+      vec2 r = vec2( fbm(p + 3.0*q + vec2(1.7,9.2) + 0.15*t),
+                     fbm(p + 3.0*q + vec2(8.3,2.8) - 0.12*t) );
+      float marble = fbm(p + 3.5*r);
+
+      // crisp gold veins from the warped field
+      float veins = abs(2.0*r.x - 1.0);
+      veins = pow(1.0 - smoothstep(0.0,0.18,veins), 2.5);
+
+      // base black-marble body
+      vec3 dark = mix(vec3(0.015,0.015,0.02), vec3(0.06,0.05,0.045), marble);
+      dark += vec3(0.10,0.09,0.10)*pow(marble,4.0);   // white-ish silver glints
+
+      // gold colour ramp
+      vec3 gold = mix(vec3(0.55,0.34,0.02), vec3(1.0,0.86,0.32), veins);
+
+      vec3 col = mix(dark, gold, veins*0.9);
+
+      // -- realistic gold lightning (concentrated upper-left, like the ref) --
+      // Each bolt = a main channel + a thinner forked branch, with its own
+      // strike timing. Glow accumulates separately from the white core so we
+      // can colour-grade hot cores toward white and bloom toward amber.
+      float glow = 0.0;     // total amber bloom
+      float hot  = 0.0;     // total white-hot core
+      float fired = 0.0;    // sum of active strike envelopes (for ambient flash)
+
+      // base x positions of the main bolts (left-weighted)
+      const int NB = 3;
+      for(int i=0;i<NB;i++){
+        float fi   = float(i);
+        float seed = fi*1.91 + 0.3;
+        float s    = strike(seed, u_time);
+        if(s <= 0.001) continue;
+        fired += s;
+
+        float baseX = 0.16 + fi*0.13;                 // main channel
+        float c; float g = boltGlow(uv, baseX, seed, u_time, c);
+        glow += g * s;  hot += c * s;
+
+        // a forked branch peeling off the main channel
+        float bseed = seed + 5.0;
+        float bc;
+        float bx = baseX + 0.07 + 0.05*sin(seed*3.0);
+        float bg = boltGlow(uv, bx, bseed, u_time, bc);
+        float bmask = smoothstep(0.65,0.35,uv.y);     // branch lives mid/low
+        glow += bg * s * 0.55 * bmask;
+        hot  += bc * s * 0.55 * bmask;
+      }
+
+      // left-weighted falloff so bolts originate from the lit side
+      float lmask = smoothstep(1.05, 0.05, uv.x);
+      glow *= lmask;  hot *= lmask;
+
+      // colour: amber bloom, white-hot filament core
+      vec3 amber = vec3(1.0, 0.74, 0.22);
+      vec3 white = vec3(1.0, 0.97, 0.86);
+      col += amber * glow * 0.9;
+      col += white * hot  * 1.3;
+
+      // ambient flash — the whole cavern lights up while a bolt is live
+      float flash = clamp(fired, 0.0, 1.5);
+      col += vec3(0.95,0.78,0.34) * flash * 0.06 * lmask;
+
+      // big soft gold light source upper-left (matches reference)
+      float key = smoothstep(0.9,0.0,distance(uv,vec2(0.16,0.78)));
+      col += vec3(0.9,0.7,0.22) * key * (0.32 + 0.12*flash);
+
+      // -- wet reflective floor (mirror lower ~26%) --
+      if(uv.y < 0.26){
+        vec2 ruv = vec2(uv.x, 0.52 - uv.y);  // reflect
+        ruv.x += 0.012*sin(uv.x*40.0 + u_time*1.2); // ripple
+        vec2 rp = ruv; rp.x *= u_res.x/u_res.y;
+        vec2 rq = vec2(fbm(rp+vec2(0.0,t)),fbm(rp+vec2(5.2,1.3-t)));
+        float rvein = pow(1.0-smoothstep(0.0,0.2,abs(2.0*rq.x-1.0)),2.5);
+        vec3 refl = mix(vec3(0.01),vec3(1.0,0.82,0.28),rvein);
+        float fade = smoothstep(0.0,0.26,uv.y);
+        col = mix(refl*1.1, col, fade);
+        col += vec3(0.9,0.72,0.25)*rvein*(1.0-fade)*0.5;
+
+        // reflect the live lightning onto the wet floor (smeared by ripples)
+        float rGlow=0.0;
+        for(int i=0;i<NB;i++){
+          float fi=float(i); float seed=fi*1.91+0.3;
+          float s=strike(seed,u_time);
+          if(s<=0.001) continue;
+          float c; float g=boltGlow(ruv,0.16+fi*0.13,seed,u_time,c);
+          rGlow += (g+c)*s;
+        }
+        rGlow *= smoothstep(1.05,0.05,uv.x) * (1.0-fade);
+        col += vec3(1.0,0.80,0.30) * rGlow * 0.7;
+      }
+
+      // mouse interactive spark glow
+      float md = distance(uv, u_mouse);
+      col += vec3(1.0,0.84,0.34) * (0.05/(md+0.08)) * 0.25;
+
+      // gentle vignette + tone
+      float vig = smoothstep(1.25,0.25,distance(uv,vec2(0.5)));
+      col *= mix(0.35,1.0,vig);
+      col = pow(col, vec3(0.85));   // lift
+
+      gl_FragColor = vec4(col,1.0);
+    }
+  `;
+
+  function compile(type,src){
+    const s = gl.createShader(type);
+    gl.shaderSource(s,src); gl.compileShader(s);
+    if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))
+      console.error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  const prog = gl.createProgram();
+  gl.attachShader(prog,compile(gl.VERTEX_SHADER,vsrc));
+  gl.attachShader(prog,compile(gl.FRAGMENT_SHADER,fsrc));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1, 3,-1, -1,3]),gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog,'p');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+
+  const uRes  = gl.getUniformLocation(prog,'u_res');
+  const uTime = gl.getUniformLocation(prog,'u_time');
+  const uMouse= gl.getUniformLocation(prog,'u_mouse');
+
+  let mouse = [0.7,0.6];
+  window.addEventListener('mousemove',e=>{
+    mouse = [e.clientX/window.innerWidth, 1.0 - e.clientY/window.innerHeight];
+  });
+
+  function resize(){
+    const dpr = Math.min(window.devicePixelRatio||1, 1.75);
+    canvas.width  = Math.floor(window.innerWidth*dpr);
+    canvas.height = Math.floor(window.innerHeight*dpr);
+    canvas.style.width = window.innerWidth+'px';
+    canvas.style.height= window.innerHeight+'px';
+    gl.viewport(0,0,canvas.width,canvas.height);
+  }
+  window.addEventListener('resize',resize);
+  resize();
+
+  const start = performance.now();
+  function frame(){
+    const t = (performance.now()-start)/1000;
+    gl.uniform2f(uRes, canvas.width, canvas.height);
+    gl.uniform1f(uTime, t);
+    gl.uniform2f(uMouse, mouse[0], mouse[1]);
+    gl.drawArrays(gl.TRIANGLES,0,3);
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+/* ---- staggered scroll-reveal for category cards ---- */
+(function(){
+  const cards = document.querySelectorAll('.cat');
+  if(!('IntersectionObserver' in window)){
+    cards.forEach(c=>c.classList.add('in')); return;
+  }
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){
+        const i = [...cards].indexOf(e.target);
+        e.target.style.transitionDelay = (i*0.1)+'s';
+        e.target.classList.add('in');
+        io.unobserve(e.target);
+      }
+    });
+  },{threshold:0.2});
+  cards.forEach(c=>io.observe(c));
+})();
+</script>
+</body>
+</html>
