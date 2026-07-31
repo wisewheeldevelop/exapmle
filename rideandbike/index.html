@@ -1,0 +1,1887 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RIDE AND BIKE · אופניים וקורקינטים בראשון לציון</title>
+<meta name="description" content="RIDE AND BIKE — אופניים, אופניים חשמליים, קורקינטים ואביזרים במרכז ראשון לציון. התאמה אישית ושירות מקצועי בגובה העיניים." />
+<meta name="theme-color" content="#050505" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='13' fill='%23f5c518'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800&family=Rubik:wght@500;700;800;900&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="commerce.css" />
+<style>
+  :root{
+    --gold:#f5c518;
+    --gold-bright:#ffe14d;
+    --gold-deep:#b8860b;
+    --ink:#15151c;
+    --muted:#5c5c68;
+    --paper:#faf8f3;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;background:var(--paper);overflow-x:hidden}
+  body{
+    font-family:"Heebo","Segoe UI",-apple-system,Helvetica,Arial,sans-serif;
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---------- HERO SHELL (dark) ---------- */
+  .hero{
+    position:relative;
+    width:100%;
+    min-height:100vh;
+    min-height:100dvh;        /* mobile browser chrome aware */
+    overflow:hidden;
+    background:#000;
+  }
+
+  /* Three.js/WebGL2 storm-road background */
+  .hero-road-scene{
+    position:absolute;inset:0;width:100%;height:100%;display:block;
+    border:0;z-index:1;pointer-events:none;background:#030406;
+  }
+  /* retired marble canvas kept only as a safe compatibility hook */
+  #fx{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    display:none;
+    z-index:1;
+  }
+
+  /* cinematic grade on top of the shader (dark) */
+  .grade{
+    position:absolute;
+    inset:0;
+    z-index:2;
+    pointer-events:none;
+    background:
+      radial-gradient(78% 86% at 34% 50%,rgba(245,197,24,.045),transparent 62%),
+      linear-gradient(90deg,transparent 0%,transparent 48%,rgba(2,3,4,.52) 66%,rgba(2,3,4,.94) 100%),
+      linear-gradient(180deg,rgba(0,0,0,.34) 0%,transparent 22%,transparent 72%,rgba(0,0,0,.72) 100%);
+    mix-blend-mode:normal;
+  }
+  .vignette{
+    position:absolute;inset:0;z-index:3;pointer-events:none;
+    box-shadow:inset 0 0 190px 25px rgba(0,0,0,.76);
+  }
+  .grain{
+    position:absolute;inset:0;z-index:4;pointer-events:none;opacity:.05;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.6'/></svg>");
+  }
+
+  /* ---------- NAV ---------- */
+  nav{
+    position:absolute;top:0;left:0;right:0;z-index:20;
+    display:flex;align-items:center;justify-content:space-between;gap:14px;
+    padding:clamp(18px,3.5vw,28px) clamp(18px,5vw,72px);
+  }
+  .brand{
+    display:flex;align-items:center;gap:12px;
+    font-weight:800;letter-spacing:.3em;font-size:clamp(15px,2.4vw,20px);
+    text-transform:uppercase;white-space:nowrap;
+  }
+  .brand-txt{direction:ltr;unicode-bidi:isolate}
+  .brand{color:#fff}
+  .brand .spark{
+    width:11px;height:11px;border-radius:50%;
+    background:var(--gold-bright);
+    box-shadow:0 0 14px 3px var(--gold),0 0 30px 6px rgba(245,197,24,.6);
+  }
+  .brand b{color:var(--gold)}
+  .links{display:flex;gap:38px;list-style:none}
+  .links a{
+    color:rgba(255,255,255,.78);text-decoration:none;
+    font-size:13px;letter-spacing:.16em;text-transform:uppercase;
+    font-weight:600;transition:color .25s;
+  }
+  .links a:hover{color:var(--gold-bright)}
+  .nav-cta{
+    border:1px solid rgba(245,197,24,.5);
+    color:var(--gold);background:rgba(245,197,24,.06);
+    padding:11px 22px;border-radius:40px;
+    font-size:12px;letter-spacing:.18em;font-weight:700;text-transform:uppercase;
+    cursor:pointer;transition:.25s;
+  }
+  .nav-cta:hover{background:var(--gold);color:#000;box-shadow:0 0 28px rgba(245,197,24,.5)}
+
+  /* ---------- CONTENT GRID ---------- */
+  .stage{
+    position:relative;z-index:10;
+    direction:ltr;            /* keep product on the left, copy on the right (matches reference) */
+    min-height:100vh;
+    min-height:100dvh;
+    display:grid;
+    grid-template-columns:1.05fr .95fr;
+    align-items:center;
+    padding:0 clamp(20px,5vw,72px);
+    gap:20px;
+    overflow:hidden;
+  }
+
+  /* Layout spacer that keeps the copy in the right-hand column and hosts the
+     product switcher. The vehicle itself is rendered by #productScene, a
+     full-bleed sibling of the road iframe. */
+  .product{
+    position:relative;
+    z-index:13;
+    justify-self:start;
+    align-self:center;
+    margin-top:40px;
+    width:min(53vw,780px);
+    height:min(80vh,760px);
+    overflow:visible;
+    pointer-events:none;
+  }
+  /* Transparent product layer. Exactly co-located with .hero-road-scene: same
+     box, same aspect, same shared camera — that agreement is what keeps the
+     wheels on the rendered asphalt. */
+  .product-scene{
+    position:absolute;inset:0;
+    width:100%;
+    height:100%;
+    display:block;
+    border:0;
+    background:transparent;
+    image-rendering:auto;
+    pointer-events:none;
+    opacity:0;
+    visibility:hidden;
+    z-index:12;
+    transition:opacity .42s ease;
+  }
+  .product-scene.active{opacity:1;visibility:visible}
+  /* Bottom-left of the product column: the vehicle now slides to a stop in
+     the lower-centre-left of the hero, so a centred pill would sit under it. */
+  .product-switcher{
+    position:absolute;z-index:5;left:0;bottom:-2%;
+    pointer-events:auto;
+    display:flex;gap:7px;padding:6px;border:1px solid rgba(255,255,255,.13);
+    border-radius:999px;background:rgba(5,6,8,.72);backdrop-filter:blur(16px);
+    box-shadow:0 16px 45px rgba(0,0,0,.35)
+  }
+  .product-switcher button{
+    min-width:104px;height:40px;padding:0 16px;border:0;border-radius:999px;
+    background:transparent;color:rgba(255,255,255,.58);font:800 12px/1 "Heebo",sans-serif;
+    cursor:pointer;transition:.25s
+  }
+  .product-switcher button[aria-selected="true"]{background:var(--gold);color:#181200;box-shadow:0 7px 18px rgba(245,197,24,.24)}
+
+  .glow-pool{
+    position:absolute;z-index:9;left:0;bottom:6%;
+    width:60%;height:30%;
+    background:radial-gradient(60% 80% at 35% 50%,rgba(245,197,24,.22),transparent 70%);
+    filter:blur(40px);pointer-events:none;
+  }
+  .hero .glow-pool{display:none}
+
+  /* copy */
+  .copy{position:relative;z-index:11;justify-self:end;max-width:520px;text-align:right;direction:rtl}
+  .impact-flash{position:absolute;z-index:10;right:2%;top:17%;width:min(50vw,720px);height:58%;pointer-events:none;opacity:0;background:radial-gradient(circle at 54% 43%,rgba(255,240,167,.46),rgba(245,197,24,.18) 17%,transparent 58%);filter:blur(8px)}
+  .crash-message{position:absolute;z-index:16;right:clamp(20px,5vw,72px);top:27%;width:min(520px,43vw);padding:22px 24px;border:1px solid rgba(245,197,24,.38);border-inline-end:2px solid var(--gold);border-radius:22px;background:rgba(3,4,6,.93);backdrop-filter:blur(18px) saturate(125%);box-shadow:0 24px 70px rgba(0,0,0,.52),0 0 45px rgba(245,197,24,.10);direction:rtl;text-align:right;pointer-events:none;opacity:0;transform:translate(-150px,105px) scale(.12);transform-origin:left 68%}
+  .crash-message::before{content:"";position:absolute;left:-13px;bottom:28%;width:24px;height:24px;background:#07080a;border-left:1px solid rgba(245,197,24,.48);border-bottom:1px solid rgba(245,197,24,.48);transform:rotate(45deg)}
+  .crash-message::after{content:"";position:absolute;left:-37px;bottom:calc(28% + 7px);width:7px;height:7px;border-radius:50%;background:var(--gold);box-shadow:0 0 14px rgba(245,197,24,.8)}
+  .crash-message .oops{display:block;color:var(--gold);font:900 12px/1 "Rubik",sans-serif;letter-spacing:.18em;margin-bottom:10px}
+  .crash-message strong{display:block;color:#fff;font:900 clamp(28px,2.8vw,43px)/1.04 "Rubik",sans-serif;margin-bottom:11px}
+  .crash-message p{max-width:480px;color:rgba(255,255,255,.76);font-size:15px;line-height:1.62}
+  .skid-trail{position:absolute;z-index:14;left:27%;top:62%;width:190px;height:44px;pointer-events:none;opacity:0;transform:skewX(-18deg)}
+  .skid-trail::before{content:"";position:absolute;left:0;right:0;bottom:7px;height:3px;border-radius:50%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.34),rgba(245,197,24,.74),transparent);filter:blur(1px)}
+  .skid-trail::after{content:"";position:absolute;right:22px;bottom:4px;width:12px;height:12px;border-radius:50%;background:rgba(220,220,220,.2);filter:blur(4px);box-shadow:-22px -7px 0 3px rgba(220,220,220,.15),-47px 2px 0 5px rgba(220,220,220,.1),-72px -4px 0 7px rgba(220,220,220,.07)}
+  .eyebrow{
+    display:inline-flex;align-items:center;gap:10px;
+    color:var(--gold);font-size:12px;letter-spacing:.34em;
+    text-transform:uppercase;font-weight:700;margin-bottom:22px;
+  }
+  .eyebrow{color:var(--gold)}
+  .eyebrow::before{content:"";width:34px;height:1px;background:linear-gradient(270deg,var(--gold),transparent)}
+  h1{
+    font-family:"Rubik","Heebo",sans-serif;
+    font-size:clamp(33px,8.5vw,92px);
+    line-height:1.0;font-weight:900;letter-spacing:-.01em;
+    margin-bottom:24px;color:#fff;
+    overflow-wrap:break-word;
+  }
+  h1 .shine{
+    background:linear-gradient(110deg,#fff 10%,var(--gold-bright) 38%,var(--gold) 50%,#7a5c00 68%,#fff 92%);
+    background-size:220% auto;
+    -webkit-background-clip:text;background-clip:text;
+    -webkit-text-fill-color:transparent;color:transparent;
+    animation:sheen 6s linear infinite;
+  }
+  @keyframes sheen{to{background-position:220% center}}
+  p.lead{
+    color:rgba(235,235,245,.72);
+    font-size:clamp(15px,1.2vw,18px);
+    line-height:1.6;margin-bottom:38px;max-width:430px;
+  }
+  .actions{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+  .btn-primary{
+    position:relative;border:none;cursor:pointer;
+    background:linear-gradient(135deg,var(--gold-bright),var(--gold-deep));
+    color:#1a1500;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+    font-size:14px;padding:18px 38px;border-radius:50px;
+    box-shadow:0 10px 30px rgba(245,197,24,.35),inset 0 1px 0 rgba(255,255,255,.6);
+    transition:transform .2s,box-shadow .2s;
+  }
+  .btn-primary:hover{transform:translateY(-3px);box-shadow:0 16px 44px rgba(245,197,24,.55)}
+  .btn-ghost{
+    background:none;border:none;cursor:pointer;color:#fff;
+    font-weight:700;letter-spacing:.1em;text-transform:uppercase;font-size:14px;
+    display:flex;align-items:center;gap:12px;
+  }
+  .btn-ghost .play{
+    width:42px;height:42px;border-radius:50%;
+    border:1px solid rgba(245,197,24,.5);
+    display:grid;place-items:center;color:var(--gold);
+    transition:.25s;
+  }
+  .btn-ghost:hover .play{background:var(--gold);color:#000;box-shadow:0 0 24px rgba(245,197,24,.5)}
+
+  .stats{
+    display:flex;gap:42px;margin-top:54px;
+    border-top:1px solid rgba(255,255,255,.08);padding-top:26px;
+  }
+  .stat .num{font-size:30px;font-weight:800;color:#fff}
+  .stat .num span{color:var(--gold)}
+  .stat .lbl{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-top:4px}
+
+  .scroll{
+    position:absolute;left:50%;bottom:26px;transform:translateX(-50%);
+    z-index:15;color:rgba(255,255,255,.5);font-size:11px;letter-spacing:.3em;
+    text-transform:uppercase;display:flex;flex-direction:column;align-items:center;gap:10px;
+  }
+  .scroll .mouse{
+    width:24px;height:38px;border:1px solid rgba(255,255,255,.3);border-radius:14px;position:relative;
+  }
+  .scroll .mouse::after{
+    content:"";position:absolute;top:7px;left:50%;transform:translateX(-50%);
+    width:3px;height:7px;border-radius:2px;background:var(--gold);
+    animation:wheel 1.8s ease-in-out infinite;
+  }
+  @keyframes wheel{0%{opacity:0;top:7px}40%{opacity:1}100%{opacity:0;top:18px}}
+
+  /* ---------- RESPONSIVE ---------- */
+  /* Compact desktop/tablet landscape: keep the three-line headline below
+     the fixed navigation without changing the two-column composition. */
+  @media (min-width:901px) and (max-width:1100px){
+    .stage{padding-top:104px;padding-bottom:30px;gap:12px}
+    .copy h1{font-size:clamp(50px,6.1vw,64px);margin-bottom:16px}
+    .copy .eyebrow{margin-bottom:14px}
+    .copy p.lead{font-size:15px;line-height:1.5;margin-bottom:22px}
+    .copy .stats{gap:18px;margin-top:30px;padding-top:18px}
+    .hero .stat .num{font-size:18px}
+    .hero .stat .lbl{font-size:9px}
+  }
+  /* Tablet & down: copy on top, vehicle underneath.
+     The road's horizon sits just under half the viewport height, so anything
+     standing on the asphalt at product scale necessarily occupies the lower
+     half. The copy therefore takes the upper band and the vehicle takes the
+     lower one — the reverse of the desktop two-column split. */
+  @media (max-width:900px){
+    .links{display:none}
+    .stage{
+      grid-template-columns:1fr;
+      /* Copy is content-sized; the vehicle band takes whatever is left, so
+         the switcher pinned to its bottom lands on the hero's bottom edge. */
+      grid-template-rows:auto 1fr;
+      text-align:center;
+      padding-top:96px;padding-bottom:24px;
+      gap:8px;
+    }
+    .copy{order:1;align-self:start;justify-self:center;text-align:center;max-width:600px}
+    .product{order:2;justify-self:center;margin-top:12px;width:min(94vw,700px);max-width:100%;height:auto;min-height:min(38vh,340px)}
+    .eyebrow{justify-content:center}
+    .actions{justify-content:center}
+    .stats{justify-content:center}
+  }
+
+  /* phones */
+  @media (max-width:560px){
+    nav{padding:16px 18px}
+    .nav-cta{padding:9px 16px;font-size:11px;letter-spacing:.12em}
+    .brand{letter-spacing:.18em;gap:9px}
+    .stage{padding-top:72px;padding-bottom:16px}
+    .product{z-index:2;margin-top:6px;margin-bottom:0;width:min(94vw,100%);height:auto;min-height:min(34vh,290px)}
+    .copy{position:relative;z-index:1;margin-top:0}
+    /* Bottom of the hero, clear of the vehicle's resting pose. */
+    .product-switcher{left:50%;top:auto;bottom:0;transform:translateX(-50%);z-index:50}
+    .product-switcher button{min-width:92px;height:37px;padding:0 12px;font-size:11px}
+    @keyframes bikeHeroRide{0%{transform:translateX(-8%) scale(.91);opacity:0}12%{opacity:1}55%{transform:translateX(0) scale(.98)}100%{transform:translateX(5%) scale(.96);opacity:1}}
+    @keyframes scooterHeroRide{0%{transform:translateX(-6%) scale(.92);opacity:0}12%{opacity:1}100%{transform:translateX(5%) scale(.96);opacity:1}}
+    .hero .eyebrow{margin-bottom:10px}
+    .hero .copy h1{margin-bottom:14px}
+    p.lead{font-size:15px;line-height:1.5;max-width:none;margin-bottom:18px}
+    .actions{gap:12px}
+    .btn-primary{padding:16px 26px;font-size:13px;flex:1 1 auto;text-align:center}
+    .btn-ghost{display:none}
+    /* stats: even 3-up row that never overflows */
+    .stats{
+      gap:0;margin-top:20px;padding-top:12px;
+      width:100%;justify-content:space-between;
+    }
+    .stat{flex:1;text-align:center}
+    .hero .stat .num{font-size:clamp(13px,3.8vw,17px)}
+    .hero .stat .lbl{letter-spacing:.08em;font-size:8px;line-height:1.3}
+    .scroll{display:none}
+  }
+
+  /* very small phones */
+  @media (max-width:360px){
+    .nav-cta{padding:8px 12px;font-size:10px}
+    .brand{font-size:14px;letter-spacing:.12em}
+    .stat .lbl{font-size:9px}
+  }
+
+  /* short landscape: don't force full-height cramming */
+  @media (max-height:560px) and (orientation:landscape){
+    .hero,.stage{min-height:auto}
+    .stage{padding-top:84px;padding-bottom:48px}
+    .scroll{display:none}
+  }
+
+  /* accessibility: honour reduced-motion */
+  @media (prefers-reduced-motion:reduce){
+    h1 .shine{animation:none}
+    .scroll .mouse::after{animation:none}
+    .cat{transition:box-shadow .3s, background .3s}
+    .product-scene.active{animation:none!important;transform:none}
+    *{scroll-behavior:auto}
+  }
+
+  /* =========================================================
+     CATEGORIES SECTION — premium 2026
+     ========================================================= */
+  .cats{
+    position:relative;
+    background:
+      radial-gradient(120% 80% at 85% -10%, rgba(202,165,61,.10), transparent 55%),
+      radial-gradient(100% 80% at 0% 110%, rgba(202,165,61,.07), transparent 50%),
+      linear-gradient(180deg,var(--paper) 0%, #fbfaf7 40%, #f1ede6 100%);
+    padding:clamp(80px,10vw,140px) clamp(24px,5vw,72px) clamp(90px,9vw,130px);
+    overflow:hidden;
+  }
+  /* soft seam at the top so it blends from the hero */
+  .cats::before{
+    content:"";position:absolute;left:0;right:0;top:0;height:160px;
+    background:linear-gradient(180deg,var(--paper),transparent);
+    pointer-events:none;
+  }
+  .cats-head{
+    max-width:1280px;margin:0 auto 56px;
+    display:flex;align-items:flex-end;justify-content:space-between;gap:30px;flex-wrap:wrap;
+  }
+  .cats-head .eyebrow{margin-bottom:14px}
+  .cats-head h2{
+    font-family:"Rubik","Heebo",sans-serif;color:var(--ink);
+    font-size:clamp(30px,4vw,56px);font-weight:900;line-height:1.04;letter-spacing:-.01em;
+  }
+  .cats-head h2 em{font-style:normal;color:var(--gold-deep)}
+  .cats-head p{color:var(--muted);max-width:360px;font-size:15px;line-height:1.6}
+
+  .cats-grid{
+    max-width:1280px;margin:0 auto;
+    display:grid;grid-template-columns:repeat(4,1fr);gap:22px;
+  }
+
+  .cat{
+    position:relative;
+    border-radius:22px;
+    padding:22px 26px 26px;
+    display:flex;flex-direction:column;
+    background:linear-gradient(160deg, #ffffff, #fcfaf3);
+    overflow:hidden;cursor:pointer;
+    transform:translateY(28px);opacity:0;
+    transition:transform .7s cubic-bezier(.16,.84,.3,1), opacity .7s ease, box-shadow .4s, background .4s;
+    box-shadow:0 16px 38px rgba(60,50,20,.10), inset 0 1px 0 rgba(255,255,255,.9);
+  }
+  .cat.in{transform:translateY(0);opacity:1}
+  /* gradient hairline border */
+  .cat::before{
+    content:"";position:absolute;inset:0;border-radius:22px;padding:1px;
+    background:linear-gradient(160deg, rgba(245,197,24,.7), rgba(60,50,20,.07) 45%, rgba(245,197,24,.15) 100%);
+    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;mask-composite:exclude;
+    pointer-events:none;transition:opacity .4s;opacity:.7;
+  }
+  /* sheen sweep on hover */
+  .cat::after{
+    content:"";position:absolute;top:0;bottom:0;width:60%;
+    left:-80%;
+    background:linear-gradient(100deg,transparent, rgba(245,197,24,.22), transparent);
+    transform:skewX(-18deg);transition:left .8s cubic-bezier(.2,.7,.3,1);
+    pointer-events:none;z-index:3;
+  }
+  .cat:hover{
+    transform:translateY(-8px);
+    background:linear-gradient(160deg, #fffdf5, #fdf4dd);
+    box-shadow:0 28px 56px rgba(60,50,20,.16), 0 0 44px rgba(245,197,24,.22), inset 0 1px 0 rgba(255,255,255,.9);
+  }
+  .cat:hover::before{opacity:1}
+  .cat:hover::after{left:120%}
+
+  .cat .idx{
+    position:absolute;top:16px;left:20px;z-index:2;
+    font-family:"Rubik",sans-serif;font-weight:900;font-size:50px;
+    color:transparent;-webkit-text-stroke:1px rgba(245,197,24,.45);
+    line-height:1;user-select:none;
+  }
+  /* product image area */
+  .cat-img{
+    position:relative;height:180px;margin:0 -6px 14px;border-radius:16px;
+    display:grid;place-items:center;
+    background:radial-gradient(60% 65% at 50% 42%, rgba(245,197,24,.18), rgba(245,197,24,0) 72%);
+  }
+  .cat-img img{
+    max-width:86%;max-height:160px;width:auto;height:auto;object-fit:contain;
+    filter:drop-shadow(0 16px 22px rgba(40,30,0,.24));
+    transition:transform .55s cubic-bezier(.2,.8,.2,1);
+  }
+  .cat:hover .cat-img img{transform:scale(1.07) rotate(-2deg)}
+
+  .cat h3{
+    font-family:"Rubik","Heebo",sans-serif;color:var(--ink);
+    font-size:22px;font-weight:800;margin:0 0 8px;
+  }
+  .cat .desc{color:var(--muted);font-size:14px;line-height:1.55;margin-bottom:18px}
+  .cat .go{
+    display:inline-flex;align-items:center;gap:8px;margin-top:auto;
+    color:var(--gold-deep);font-weight:700;font-size:13px;letter-spacing:.04em;
+    transition:gap .3s,color .3s;
+  }
+  .cat:hover .go{gap:14px;color:#9c6f08}
+  .cat .go .arr{display:inline-block;transition:transform .3s}
+  .cat:hover .go .arr{transform:translateX(-4px)}
+
+  @media (max-width:1000px){
+    .cats-grid{grid-template-columns:repeat(2,1fr);gap:16px}
+    .cats-head{margin-bottom:40px}
+  }
+  @media (max-width:560px){
+    .cats{padding:64px 18px 80px}
+    .cats-head h2{font-size:clamp(26px,7vw,40px)}
+    .cats-head p{max-width:none}
+    .cats-grid{grid-template-columns:1fr;gap:14px}
+    .cat{min-height:auto;padding:20px 22px 24px}
+    .cat-img{height:200px}
+    .cat-img img{max-height:180px}
+  }
+
+  /* =========================================================
+     RIDE AND BIKE — complete homepage system
+     ========================================================= */
+  html{scroll-behavior:smooth;scroll-padding-top:96px}
+  body{background:#f5f3ee}
+  ::selection{background:var(--gold);color:#070707}
+  a,button{-webkit-tap-highlight-color:transparent}
+  img{max-width:100%}
+  .section-shell{width:min(1180px,calc(100% - 48px));margin-inline:auto}
+  .section-kicker{display:inline-flex;align-items:center;gap:12px;margin-bottom:22px;color:#8a6700;font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase}
+  .section-kicker::before{content:"";width:32px;height:1px;background:currentColor}
+  .section-title{font-family:"Rubik","Heebo",sans-serif;font-size:clamp(42px,7vw,94px);line-height:.95;letter-spacing:-.045em;font-weight:900}
+  .section-copy{font-size:clamp(17px,1.6vw,21px);line-height:1.75;color:#66636b}
+  .btn-primary,.nav-cta{text-decoration:none}
+  .btn-primary{display:inline-flex;align-items:center;justify-content:center;gap:10px}
+  .btn-primary::after{content:"←";transition:transform .25s ease}
+  .btn-primary:hover::after{transform:translateX(-4px)}
+
+  .site-nav{position:fixed;top:0;left:0;right:0;z-index:60;background:rgba(5,5,5,.68);border-bottom:1px solid rgba(255,255,255,.07);backdrop-filter:blur(18px) saturate(145%);transition:background .35s ease,border-color .35s ease,padding .35s ease,backdrop-filter .35s ease}
+  .site-nav.scrolled{padding-top:14px;padding-bottom:14px;background:rgba(5,5,5,.86);border-color:rgba(255,255,255,.1);backdrop-filter:blur(24px) saturate(155%)}
+  .brand{text-decoration:none}
+  .brand-txt{font-size:clamp(13px,1.4vw,18px);letter-spacing:.2em}
+  .nav-cta{display:inline-flex;align-items:center;justify-content:center}
+  .menu-toggle{display:none;width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.17);background:rgba(255,255,255,.05);cursor:pointer;place-items:center;padding:0}
+  .menu-toggle span{position:absolute;width:17px;height:1.5px;background:#fff;transition:.25s ease}
+  .menu-toggle span:first-child{transform:translateY(-4px)}
+  .menu-toggle span:last-child{transform:translateY(4px)}
+  .menu-toggle[aria-expanded="true"] span:first-child{transform:rotate(45deg)}
+  .menu-toggle[aria-expanded="true"] span:last-child{transform:rotate(-45deg)}
+  .mobile-menu{display:none;position:absolute;top:calc(100% + 8px);left:18px;right:18px;padding:14px;border:1px solid rgba(255,255,255,.1);border-radius:22px;background:rgba(9,9,9,.96);box-shadow:0 24px 70px rgba(0,0,0,.5);backdrop-filter:blur(22px)}
+  .mobile-menu a{display:flex;align-items:center;justify-content:space-between;padding:15px 12px;color:#fff;text-decoration:none;font-size:16px;font-weight:700;border-bottom:1px solid rgba(255,255,255,.08)}
+  .mobile-menu a::after{content:"←";color:var(--gold)}
+  .mobile-menu a:last-child{border:0}
+  .mobile-menu.open{display:block}
+
+  .copy{position:relative;z-index:2;max-width:570px}
+  .copy h1{font-size:clamp(48px,7vw,92px)}
+  .copy p.lead{max-width:490px}
+  .hero .stats{gap:0;width:min(100%,500px)}
+  .hero .stat{flex:1;padding-inline:16px;border-inline-start:1px solid rgba(255,255,255,.09)}
+  .hero .stat:first-child{padding-inline-start:0;border:0}
+  .hero .stat .num{font-size:clamp(17px,1.8vw,24px);line-height:1.15}
+  .hero .stat .lbl{line-height:1.5;letter-spacing:.1em}
+  .btn-ghost .play{font-size:20px;line-height:1}
+
+  .trust-strip{background:#050505;color:#fff;border-top:1px solid rgba(255,255,255,.08)}
+  .trust-grid{display:grid;grid-template-columns:repeat(3,1fr);min-height:126px}
+  .trust-item{display:flex;align-items:center;gap:17px;padding:28px 34px;border-inline-start:1px solid rgba(255,255,255,.08)}
+  .trust-item:first-child{border:0}
+  .trust-mark{font-family:"Rubik",sans-serif;color:var(--gold);font-size:13px;font-weight:900;letter-spacing:.1em}
+  .trust-item strong{display:block;font-size:16px;margin-bottom:3px}
+  .trust-item span:last-child{color:rgba(255,255,255,.5);font-size:13px}
+
+  .site-nav .cart-trigger{color:#fff}
+  .home-shop{padding:clamp(82px,10vw,136px) 0;background:#f7f4ed}
+  .home-shop-head{display:flex;align-items:end;justify-content:space-between;gap:40px;margin-bottom:48px}
+  .home-shop-head .section-copy{max-width:470px}
+  .home-product-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+  .home-product-card{position:relative;display:flex;flex-direction:column;min-width:0;border:1px solid #ded9cf;border-radius:30px;background:#fff;overflow:hidden;box-shadow:0 24px 65px rgba(52,43,16,.08);transition:.3s ease}
+  .home-product-card:hover{transform:translateY(-7px);box-shadow:0 34px 78px rgba(52,43,16,.14)}
+  .home-product-visual{position:relative;aspect-ratio:1.12;background:radial-gradient(circle at 50% 45%,#2c260d,#08090b 66%);overflow:hidden}
+  .home-product-visual img{width:100%;height:100%;object-fit:contain;padding:18px;filter:drop-shadow(0 22px 18px rgba(0,0,0,.45))}
+  .home-sale{position:absolute;z-index:2;top:15px;right:15px;padding:8px 11px;border-radius:999px;background:var(--gold);color:#171100;font-size:11px;font-weight:900}
+  .home-product-body{display:flex;flex:1;flex-direction:column;padding:22px}
+  .home-product-brand{color:#a47d00;font:800 10px/1 "Rubik",sans-serif;letter-spacing:.14em;text-transform:uppercase}
+  .home-product-body h3{font:900 23px/1.05 "Rubik",sans-serif;margin:10px 0 8px}
+  .home-product-body p{min-height:50px;color:#716c65;font-size:13px;line-height:1.6}
+  .home-product-specs{display:flex;gap:8px;flex-wrap:wrap;margin:15px 0}
+  .home-product-specs span{padding:7px 9px;border-radius:999px;background:#f3f0e8;color:#514d47;font-size:11px;font-weight:700}
+  .home-product-body .product-price{margin-top:auto}
+  .home-product-actions{display:grid;grid-template-columns:1fr auto;gap:8px}
+  .home-product-actions a{display:grid;place-items:center;min-height:48px;padding:0 14px;border:1px solid #d7d2c8;border-radius:999px;color:#111;text-decoration:none;font-size:13px;font-weight:800}
+  .home-product-actions .add-cart-btn{min-width:122px}
+  .shop-all{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin-top:36px}
+  .shop-all a{display:inline-flex;align-items:center;justify-content:center;min-height:52px;padding:0 25px;border-radius:999px;background:#111;color:#fff;text-decoration:none;font-weight:800}
+  .shop-all a:last-child{background:var(--gold);color:#171100}
+
+  .quality-feature{display:grid;grid-template-columns:1fr 1fr;min-height:680px;background:#070708;color:#fff}
+  .quality-photo{min-height:560px;background:url("home-bike-detail-v3.png") right center/cover no-repeat}
+  .quality-copy{display:flex;align-items:center;padding:clamp(54px,8vw,120px)}
+  .quality-copy-inner{max-width:560px}
+  .quality-copy .section-kicker{color:var(--gold)}
+  .quality-copy h2{font:900 clamp(45px,6.6vw,92px)/.96 "Rubik",sans-serif;margin:18px 0 28px}
+  .quality-copy h2 span{color:var(--gold)}
+  .quality-copy p{color:rgba(255,255,255,.62);font-size:18px;line-height:1.75}
+  .quality-points{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:32px}
+  .quality-point{padding:17px;border:1px solid rgba(255,255,255,.1);border-radius:17px;background:rgba(255,255,255,.035)}
+  .quality-point strong{display:block;color:var(--gold);margin-bottom:5px}.quality-point span{color:rgba(255,255,255,.55);font-size:13px}
+
+  .fulfillment{padding:clamp(82px,10vw,140px) 0;background:#fff}
+  .fulfillment-grid{display:grid;grid-template-columns:1.12fr .88fr;align-items:center;gap:clamp(34px,7vw,90px)}
+  .fulfillment-photo{overflow:hidden;border-radius:40px;box-shadow:0 38px 90px rgba(53,42,11,.16)}
+  .fulfillment-photo img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;object-position:left center}
+  .fulfillment-copy h2{font:900 clamp(45px,6.6vw,86px)/.98 "Rubik",sans-serif;margin:18px 0 27px}
+  .fulfillment-copy h2 span{color:#d4a600}.fulfillment-copy>p{color:#706b63;font-size:18px;line-height:1.75}
+  .fulfillment-choices{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:30px 0}
+  .fulfillment-choice{padding:20px;border:1px solid #ded9cf;border-radius:20px;background:#faf8f3}
+  .fulfillment-choice strong{display:block;font-size:17px;margin-bottom:5px}.fulfillment-choice span{color:#777168;font-size:13px}
+  .fulfillment-copy .btn-primary{text-decoration:none}
+
+  .manifesto{position:relative;overflow:hidden;background:#090909;color:#fff;padding:clamp(92px,12vw,170px) 0}
+  .manifesto::before{content:"RIDE";position:absolute;left:-.05em;top:-.24em;color:rgba(255,255,255,.025);font-family:"Rubik",sans-serif;font-size:min(37vw,520px);font-weight:900;letter-spacing:-.09em;line-height:1}
+  .manifesto-grid{position:relative;display:grid;grid-template-columns:.86fr 1.14fr;align-items:center;gap:clamp(40px,7vw,100px)}
+  .manifesto-copy{position:relative;z-index:2}
+  .manifesto .section-kicker{color:var(--gold)}
+  .manifesto .section-title{max-width:650px;margin-bottom:34px}
+  .manifesto .section-title em{font-style:normal;color:var(--gold)}
+  .manifesto .section-copy{max-width:550px;color:rgba(255,255,255,.58)}
+  .manifesto-line{width:84px;height:1px;margin:40px 0 26px;background:linear-gradient(90deg,var(--gold),transparent)}
+  .manifesto-note{font-size:14px;line-height:1.8;color:rgba(255,255,255,.76)}
+  .manifesto-visual{position:relative;min-height:0;aspect-ratio:4/3;border-radius:42px;overflow:hidden;background:#f5b900;border:1px solid rgba(255,255,255,.08);box-shadow:0 45px 100px rgba(0,0,0,.45)}
+  .manifesto-visual::before,.manifesto-visual::after{display:none}
+  .manifesto-visual img{position:absolute;z-index:2;width:100%;height:100%;max-width:none;inset:0;object-fit:cover;object-position:90% center}
+  .visual-tag{position:absolute;z-index:3;top:28px;right:28px;direction:ltr;color:var(--gold);font:800 11px/1 "Rubik",sans-serif;letter-spacing:.2em;text-transform:uppercase}
+
+  .care{position:relative;padding:clamp(92px,11vw,156px) 0;background:#f5f3ee}
+  .care-head{display:grid;grid-template-columns:1.25fr .75fr;align-items:end;gap:60px;margin-bottom:62px}
+  .care-head .section-title{max-width:760px;color:#101014}
+  .care-head .section-copy{max-width:430px}
+  .care-grid{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid #d8d4ca;border-bottom:1px solid #d8d4ca}
+  .care-card{min-height:430px;padding:40px 30px;border-inline-start:1px solid #d8d4ca;transition:background .35s,transform .35s}
+  .care-card:first-child{border:0}
+  .care-card:hover{background:#fff;transform:translateY(-5px)}
+  .care-index{display:flex;align-items:center;justify-content:space-between;direction:ltr;color:#a67c00;font:800 12px/1 "Rubik",sans-serif;letter-spacing:.16em}
+  .care-index::after{content:"";width:34px;height:1px;background:#d5aa21}
+  .care-art{width:100%;aspect-ratio:4/3;object-fit:contain;margin:26px 0 24px;border-radius:18px;background:radial-gradient(circle at 50% 38%,#242830,#090a0d 74%);box-shadow:0 18px 42px rgba(24,20,8,.16)}
+  .care-webgl{position:relative;isolation:isolate;overflow:hidden;border:1px solid rgba(245,197,24,.25);background:radial-gradient(circle at 52% 42%,#282b31 0,#111318 50%,#050608 100%)}
+  .care-webgl::before{content:"";position:absolute;z-index:2;inset:0;pointer-events:none;background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.06) 48%,transparent 60%),linear-gradient(180deg,transparent 62%,rgba(0,0,0,.62));mix-blend-mode:screen}
+  .care-webgl::after{content:"WEBGL2 · LIVE PRODUCT";position:absolute;z-index:3;left:16px;bottom:14px;direction:ltr;color:rgba(255,229,104,.82);font:800 9px/1 "Rubik",sans-serif;letter-spacing:.16em}
+  .care-webgl iframe{position:absolute;z-index:1;inset:0;width:100%;height:100%;border:0;background:transparent;pointer-events:none}
+  .care-live-badge{position:absolute;z-index:4;top:14px;right:14px;display:flex;align-items:center;gap:7px;padding:7px 10px;border:1px solid rgba(255,255,255,.12);border-radius:999px;background:rgba(5,6,8,.58);backdrop-filter:blur(10px);color:#fff;font:700 9px/1 "Rubik",sans-serif;letter-spacing:.08em}
+  .care-live-badge::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 10px var(--gold);animation:livePulse 1.8s ease-in-out infinite}
+  @keyframes livePulse{50%{opacity:.35;transform:scale(.72)}}
+  .care-card h3{font-family:"Rubik",sans-serif;font-size:clamp(24px,2.1vw,32px);line-height:1.08;margin:0 0 18px}
+  .care-card p{color:#6d6970;line-height:1.75;font-size:15px}
+
+  .visit{position:relative;isolation:isolate;overflow:hidden;background:#efc000;color:#111;padding:clamp(88px,12vw,168px) 0}
+  .visit::before{content:"";position:absolute;z-index:-1;width:760px;height:760px;left:-180px;top:-250px;border-radius:50%;border:1px solid rgba(0,0,0,.16);box-shadow:0 0 0 70px rgba(0,0,0,.035),0 0 0 140px rgba(0,0,0,.025)}
+  .visit-grid{display:grid;grid-template-columns:1.08fr .92fr;align-items:center;gap:80px}
+  .visit .section-kicker{color:#322800}
+  .visit .section-title{font-size:clamp(58px,10vw,138px);margin-bottom:32px}
+  .visit-copy{max-width:540px;font-size:clamp(18px,1.7vw,22px);line-height:1.75;color:rgba(0,0,0,.66)}
+  .visit-actions{display:flex;gap:14px;flex-wrap:wrap;margin-top:38px}
+  .visit-btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:56px;padding:0 27px;border-radius:999px;text-decoration:none;font-size:14px;font-weight:800;transition:.25s ease}
+  .visit-btn.dark{background:#101010;color:#fff;box-shadow:0 15px 35px rgba(0,0,0,.18)}
+  .visit-btn.light{border:1px solid rgba(0,0,0,.28);color:#111}
+  .visit-btn:hover{transform:translateY(-3px)}
+  .location-card{position:relative;min-height:470px;padding:42px;border-radius:40px;background:linear-gradient(180deg,rgba(0,0,0,.03) 42%,rgba(0,0,0,.58)),url("home-location-pin-v3.png") right center/cover no-repeat;color:#fff;box-shadow:0 45px 100px rgba(40,30,0,.28);overflow:hidden}
+  .location-card::before{content:"";position:absolute;width:340px;height:340px;left:-100px;bottom:-150px;border-radius:50%;background:radial-gradient(circle,rgba(245,197,24,.28),transparent 67%)}
+  .location-top{display:flex;justify-content:space-between;align-items:center;color:rgba(255,255,255,.46);font-size:12px;letter-spacing:.14em;text-transform:uppercase}
+  .location-pin{display:none}
+  .location-pin::before{content:"";width:30px;height:38px;border-radius:50% 50% 50% 0;background:var(--gold);transform:rotate(-45deg)}
+  .location-pin::after{content:"";position:absolute;width:9px;height:9px;border-radius:50%;background:#111;top:36px;left:43px}
+  .location-card h3{position:absolute;left:36px;right:auto;bottom:68px;direction:ltr;text-align:left;font-family:"Rubik",sans-serif;font-size:30px;margin-bottom:8px;text-shadow:0 4px 20px rgba(0,0,0,.45)}
+  .location-card p{position:absolute;left:36px;right:auto;bottom:40px;text-align:left;color:rgba(255,255,255,.78);font-size:14px;text-shadow:0 4px 20px rgba(0,0,0,.45)}
+
+  .closing{background:#070707;color:#fff;padding:clamp(90px,11vw,150px) 0;border-bottom:1px solid rgba(255,255,255,.08)}
+  .closing-inner{text-align:center}
+  .closing-mark{display:block;margin-bottom:24px;color:var(--gold);font:800 12px/1 "Rubik",sans-serif;letter-spacing:.28em;direction:ltr}
+  .closing h2{font-family:"Rubik",sans-serif;font-size:clamp(48px,8vw,108px);line-height:.98;letter-spacing:-.05em;max-width:1000px;margin:0 auto 40px}
+  .closing h2 span{color:var(--gold)}
+  .closing p{max-width:620px;margin:0 auto 40px;color:rgba(255,255,255,.55);font-size:18px;line-height:1.75}
+  .closing .btn-primary{box-shadow:none}
+  .site-footer{background:#070707;color:#fff;padding:56px 0 30px}
+  .footer-main{display:grid;grid-template-columns:1.2fr .8fr .8fr;gap:60px;padding-bottom:52px}
+  .footer-brand{font:900 clamp(24px,3vw,38px)/1 "Rubik",sans-serif;letter-spacing:-.04em;direction:ltr;text-align:right}
+  .footer-brand span{color:var(--gold)}
+  .footer-about{max-width:420px;color:rgba(255,255,255,.44);line-height:1.7;margin-top:18px}
+  .footer-col h3{font-size:12px;color:var(--gold);letter-spacing:.16em;margin-bottom:19px}
+  .footer-col a,.footer-col p{display:block;color:rgba(255,255,255,.6);text-decoration:none;line-height:2;font-size:14px}
+  .footer-col a:hover{color:#fff}
+  .footer-bottom{display:flex;justify-content:space-between;gap:24px;padding-top:25px;border-top:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.32);font-size:12px}
+  .footer-bottom span:first-child{direction:ltr}
+
+  .js [data-reveal]{opacity:0;transform:translateY(34px);transition:opacity .8s cubic-bezier(.2,.7,.2,1),transform .8s cubic-bezier(.2,.7,.2,1)}
+  .js [data-reveal="left"]{transform:translateX(-40px)}
+  .js [data-reveal="right"]{transform:translateX(40px)}
+  .js [data-reveal].revealed{opacity:1;transform:none}
+
+  @media (max-width:1000px){
+    .manifesto-grid,.visit-grid{grid-template-columns:1fr;gap:55px}
+    .manifesto-copy{max-width:760px}
+    .manifesto-visual{min-height:0}
+    .care-head{grid-template-columns:1fr;gap:28px}
+    .care-grid{grid-template-columns:repeat(2,1fr)}
+    .care-card:nth-child(3){border-inline-start:0;border-top:1px solid #d8d4ca}
+    .care-card:nth-child(4){border-top:1px solid #d8d4ca}
+    .location-card{max-width:620px;width:100%;margin-inline:auto}
+    .home-product-grid{grid-template-columns:repeat(2,1fr)}
+    .quality-feature{grid-template-columns:1fr}.quality-photo{min-height:520px}.fulfillment-grid{grid-template-columns:1fr}
+  }
+  @media (max-width:900px){
+    .site-nav .nav-cta{display:none}
+    .site-nav .menu-toggle{display:grid}
+    .site-nav .cart-trigger{margin-inline-start:auto;margin-inline-end:8px}
+    .site-nav{padding:16px 20px}
+    .stage,.copy{width:100%;min-width:0}
+    .trust-grid{grid-template-columns:1fr}
+    .trust-item{border-inline-start:0;border-top:1px solid rgba(255,255,255,.08);padding:23px 4px}
+    .trust-item:first-child{border-top:0}
+    .product{z-index:13}.copy{z-index:11}
+    .impact-flash{right:0;top:43%;width:100%;height:34%}
+    .crash-message{right:20px;left:20px;top:52%;width:auto;padding:18px 19px;border:1px solid rgba(245,197,24,.32);border-inline-end:2px solid var(--gold);border-radius:19px;background:rgba(3,4,6,.94);backdrop-filter:blur(16px) saturate(120%);box-shadow:0 24px 60px rgba(0,0,0,.48);transform-origin:76% 0}
+    .crash-message::before{left:auto;right:58px;top:-13px;bottom:auto;border-left:1px solid rgba(245,197,24,.48);border-bottom:0;border-top:1px solid rgba(245,197,24,.48)}
+    .crash-message::after{left:auto;right:67px;top:-36px;bottom:auto}
+    .crash-message strong{font-size:clamp(23px,7vw,32px)}
+    .crash-message p{font-size:13px}
+    .skid-trail{left:24%;top:38%;width:150px}
+  }
+  @media (max-width:680px){
+    .section-shell{width:min(100% - 36px,1180px)}
+    .site-nav .brand{position:absolute;right:20px;left:auto;width:210px;max-width:calc(100% - 92px);direction:ltr;justify-content:flex-start;overflow:hidden}
+    .site-nav .brand-txt{font-size:11px;letter-spacing:.12em}
+    .site-nav .menu-toggle{margin-inline-start:auto}
+    .stage{grid-template-columns:minmax(0,1fr);padding-inline:20px}
+    .site-nav .cart-trigger{position:absolute;left:72px;top:16px;margin:0}
+    .site-nav .menu-toggle{position:absolute;left:20px;top:16px}
+    .hero .copy{width:calc(100vw - 40px);max-width:none;justify-self:start}
+    .hero .product{z-index:13;transform:none;transform-origin:center bottom}
+    .hero .copy h1{font-size:clamp(38px,10vw,48px);line-height:1}
+    .hero .copy p.lead{width:100%}
+    .hero .actions{width:100%;flex-direction:column;align-items:stretch}
+    .hero .btn-primary{width:100%;flex:none}
+    .hero .btn-ghost{justify-content:center}
+    .hero .stats{margin-top:36px;padding-top:20px}
+    .hero .stat{padding-inline:9px}
+    .hero .stat .num{font-size:15px}
+    .hero .stat .lbl{font-size:9px}
+    .trust-grid{min-height:0;padding:12px 0}
+    .manifesto{padding:92px 0}
+    .manifesto-visual{min-height:0;aspect-ratio:4/3;border-radius:28px}
+    .manifesto-visual img{width:100%;height:100%;inset:0}
+    .home-shop-head{display:block}.home-shop-head .section-copy{margin-top:18px}.home-product-grid{grid-template-columns:1fr;gap:14px}.home-product-card{border-radius:24px}.home-product-visual{aspect-ratio:1.35}.home-product-body p{min-height:0}
+    .quality-photo{min-height:0;aspect-ratio:4/3;background-position:right center}.quality-copy{padding:60px 22px}.quality-points{grid-template-columns:1fr}.fulfillment-photo{border-radius:25px}.fulfillment-photo img{aspect-ratio:4/3;object-position:left center}.fulfillment-choices{grid-template-columns:1fr}
+    .care{padding:92px 0}
+    .care-grid{grid-template-columns:1fr}
+    .care-card,.care-card:nth-child(3){min-height:280px;border-inline-start:0;border-top:1px solid #d8d4ca;padding:32px 22px}
+    .care-card:first-child{border-top:0}
+    .care-card h3{margin-top:0}
+    .visit-grid{gap:48px}
+    .visit .section-title{font-size:clamp(52px,18vw,86px)}
+    .visit-actions{flex-direction:column}
+    .visit-btn{width:100%}
+    .location-card{min-height:350px;padding:28px 22px;border-radius:28px;background-position:center,right center}
+    .location-card h3{left:22px;right:auto;bottom:66px;font-size:25px}
+    .location-card p{left:22px;right:auto;bottom:38px}
+    .footer-main{grid-template-columns:1fr;gap:36px}
+    .footer-bottom{flex-direction:column-reverse}
+  }
+  @media (prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto}
+    .js [data-reveal]{opacity:1;transform:none;transition:none}
+    .site-nav,.care-card,.visit-btn{transition:none}
+    .product-scene.active,.copy h1,.copy .eyebrow,.copy p.lead,.impact-flash,.crash-message,.skid-trail,.care-live-badge::before{animation:none!important}
+    .hero-road-scene.hero-jolt,.product-scene.hero-jolt{animation:none!important}
+  }
+  /* The product's distance, perspective and pose are owned exclusively by
+     Three.js. The iframe is only cross-faded while products are exchanged. */
+  .product-scene{filter:none!important}
+  .product-scene.active{animation:none!important}
+  /* Impact shake. Both WebGL layers carry the identical transform so the road
+     and the vehicle never separate, even for a frame. */
+  .hero-road-scene.hero-jolt,.product-scene.hero-jolt{
+    animation:heroJolt .46s cubic-bezier(.25,.9,.3,1) 1;
+    will-change:transform;
+  }
+  @keyframes heroJolt{
+    0%{transform:translate3d(0,0,0)}
+    12%{transform:translate3d(-9px,5px,0) scale(1.006)}
+    26%{transform:translate3d(7px,-4px,0) scale(1.004)}
+    44%{transform:translate3d(-5px,2px,0)}
+    64%{transform:translate3d(3px,-2px,0)}
+    82%{transform:translate3d(-1px,1px,0)}
+    100%{transform:translate3d(0,0,0)}
+  }
+  .stage[data-ride] .impact-flash,
+  .stage[data-ride] .copy h1,
+  .stage[data-ride] .copy .eyebrow,
+  .stage[data-ride] .copy p.lead,
+  .stage[data-ride] .crash-message,
+  .stage[data-ride] .skid-trail{animation:none!important}
+  .stage[data-ride] .impact-flash.ride-impact{animation:rideImpactEvent .58s ease-out 1!important}
+  /* The product speaks without replacing or reflowing the original hero. */
+  .hero .ride-speech{
+    left:clamp(24px,4vw,64px);right:auto;top:21%;
+    width:min(380px,31vw);padding:18px 20px;
+    border:1px solid rgba(245,197,24,.44);
+    border-inline-start:2px solid var(--gold);border-inline-end:1px solid rgba(245,197,24,.44);
+    border-radius:20px;background:rgba(3,4,6,.91);
+    transform:translateY(18px) scale(.94);transform-origin:right 72%;
+  }
+  .hero .ride-speech::before{
+    left:auto;right:-13px;bottom:24%;
+    border:0;border-top:1px solid rgba(245,197,24,.48);
+    border-right:1px solid rgba(245,197,24,.48);
+  }
+  .hero .ride-speech::after{left:auto;right:-37px;bottom:calc(24% + 7px)}
+  .hero .ride-speech .oops{font-size:10px;margin-bottom:8px}
+  .hero .ride-speech strong{font-size:clamp(22px,2vw,31px);line-height:1.08;margin-bottom:8px}
+  .hero .ride-speech p{font-size:13px;line-height:1.5}
+  .hero .ride-speech .ride-contact-pin{display:none}
+  .stage[data-ride] .crash-message.ride-visible{animation:rideMessageEvent .58s cubic-bezier(.2,.78,.2,1) 1 forwards!important}
+  .stage[data-ride] .skid-trail.ride-visible{animation:rideSkidEvent .72s ease-out 1!important}
+  @keyframes rideImpactEvent{0%,100%{opacity:0}18%{opacity:1}48%{opacity:.22}}
+  @keyframes rideMessageEvent{
+    0%{opacity:0;transform:translateY(18px) scale(.94)}
+    65%{opacity:1;transform:translateY(-2px) scale(1.015)}
+    100%{opacity:1;transform:none}
+  }
+  @keyframes rideSkidEvent{
+    0%{opacity:0;transform:translateX(-28px) skewX(-18deg)}
+    28%,72%{opacity:.9;transform:translateX(22px) skewX(-18deg)}
+    100%{opacity:0;transform:translateX(42px) skewX(-18deg)}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .impact-flash.ride-impact,.crash-message.ride-visible,.skid-trail.ride-visible{animation:none!important}
+    .crash-message.ride-visible{opacity:1;transform:none}
+  }
+  @media (max-width:900px){
+    .hero .ride-speech{
+      left:20px;right:auto;top:17%;width:min(320px,calc(100% - 40px));
+      padding:13px 15px;border-radius:16px;transform-origin:72% 100%;
+    }
+    .hero .ride-speech::before{
+      left:auto;right:54px;top:auto;bottom:-12px;
+      border:0;border-right:1px solid rgba(245,197,24,.48);
+      border-bottom:1px solid rgba(245,197,24,.48);
+    }
+    .hero .ride-speech::after{left:auto;right:63px;top:auto;bottom:-34px}
+    /* The phone hero gives the bubble a fixed slot: below the vehicle and
+       above the switcher. With action buttons in it, it only fits that slot
+       if the type is tightened — otherwise it gets pushed up over the wheels. */
+    .hero .ride-speech{padding:11px 13px}
+    .hero .ride-speech .oops{font-size:9px;margin-bottom:4px}
+    .hero .ride-speech strong{font-size:17px;line-height:1.08;margin-bottom:5px}
+    .hero .ride-speech p{font-size:11px;line-height:1.32}
+  }
+  /* Three.js supplies the projected cockpit contact point. These rules draw
+     one continuous tether from the copy to that exact physical point. */
+  .hero .ride-speech.ride-anchored::before{
+    content:"";display:block;position:absolute;
+    left:var(--speech-pin-x,50%);right:auto;top:100%;bottom:auto;
+    width:1px;height:var(--speech-pin-drop,40px);
+    border:0;background:linear-gradient(180deg,var(--gold),rgba(245,197,24,.2));
+    transform:none;box-shadow:0 0 9px rgba(245,197,24,.35);
+  }
+  .hero .ride-speech.ride-anchored::after{display:none}
+  /* Stacked phone layout: the bubble sits on the asphalt under the vehicle,
+     so the tether is dropped and proximity does the pointing. */
+  .hero .ride-speech.ride-anchored.ride-anchored-below::before,
+  .hero .ride-speech.ride-anchored.ride-anchored-below .ride-contact-pin{display:none}
+  /* Wide layouts: the vehicle parks under the headline, so the bubble steps
+     into the open half of the frame and reaches across to it. */
+  .hero .ride-speech.ride-anchored.ride-anchored-side::before{
+    left:100%;top:var(--speech-pin-y,50%);
+    width:var(--speech-pin-reach,40px);height:1px;
+    background:linear-gradient(90deg,var(--gold),rgba(245,197,24,.15));
+  }
+  .hero .ride-speech.ride-anchored.ride-anchored-side .ride-contact-pin{
+    left:calc(100% + var(--speech-pin-reach,40px));
+    top:var(--speech-pin-y,50%);
+  }
+  .hero .ride-speech.ride-anchored .ride-contact-pin{
+    display:block;position:absolute;z-index:2;
+    left:var(--speech-pin-x,50%);
+    top:calc(100% + var(--speech-pin-drop,40px));
+    width:8px;height:8px;border-radius:50%;
+    background:var(--gold-bright);
+    box-shadow:0 0 0 4px rgba(245,197,24,.09),0 0 16px rgba(245,197,24,.9);
+    transform:translate(-50%,-50%);
+  }
+  /* The vehicle is the closer: once it parks on the copy the bubble stops
+     narrating and starts asking for the sale. */
+  .ride-speech-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:15px}
+  .ride-speech-actions[hidden]{display:none}
+  .ride-speech-buy,.ride-speech-alt{
+    display:inline-flex;align-items:center;justify-content:center;gap:7px;
+    min-height:42px;padding:0 18px;border-radius:999px;
+    font:800 13px/1 "Heebo",sans-serif;text-decoration:none;white-space:nowrap;
+    transition:transform .2s ease,box-shadow .2s ease,background .2s ease;
+  }
+  .ride-speech-buy{
+    background:linear-gradient(135deg,var(--gold-bright),var(--gold-deep));
+    color:#1a1500;box-shadow:0 8px 22px rgba(245,197,24,.32);
+  }
+  .ride-speech-buy::after{content:"←";transition:transform .2s ease}
+  .ride-speech-buy:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(245,197,24,.48)}
+  .ride-speech-buy:hover::after{transform:translateX(-3px)}
+  .ride-speech-alt{border:1px solid rgba(245,197,24,.42);color:var(--gold)}
+  .ride-speech-alt:hover{background:rgba(245,197,24,.12)}
+  .crash-message{pointer-events:none}
+  .crash-message.ride-visible{pointer-events:auto}
+  @media (max-width:900px){
+    .ride-speech-actions{margin-top:9px;gap:7px}
+    .ride-speech-buy,.ride-speech-alt{min-height:34px;padding:0 13px;font-size:12px}
+  }
+  /* Test ride: the one action that lets a visitor feel the product before
+     buying it, so it sits beside the primary CTA rather than below the fold. */
+  .btn-testride{
+    display:inline-flex;align-items:center;justify-content:center;gap:10px;
+    padding:17px 26px;border-radius:50px;text-decoration:none;
+    border:1px solid rgba(245,197,24,.45);background:rgba(245,197,24,.07);
+    color:var(--gold);font-weight:800;letter-spacing:.1em;text-transform:uppercase;font-size:13px;
+    transition:transform .2s ease,background .25s ease,box-shadow .25s ease;
+  }
+  .btn-testride:hover{transform:translateY(-3px);background:rgba(245,197,24,.16);
+    box-shadow:0 14px 34px rgba(245,197,24,.22)}
+  .btn-testride .tr-dot{width:8px;height:8px;border-radius:50%;background:var(--gold-bright);
+    box-shadow:0 0 12px var(--gold);animation:trPulse 2s ease-in-out infinite}
+  @keyframes trPulse{50%{opacity:.4;transform:scale(.7)}}
+  @media (max-width:560px){
+    .hero .btn-testride{width:100%;padding:15px 20px;font-size:12px}
+  }
+  @media (prefers-reduced-motion:reduce){.btn-testride .tr-dot{animation:none}}
+  .cat{text-decoration:none;color:inherit}
+</style>
+<script>document.documentElement.classList.add('js')</script>
+</head>
+<body>
+<section class="hero" id="home">
+  <!-- Full-bleed Three.js/WebGL2 road, storm sky and lightning -->
+  <iframe class="hero-road-scene" id="roadScene" src="hero-road.embed.html" title="כביש רטוב ושמי סערה עם ברק" tabindex="-1" aria-hidden="true" loading="eager"></iframe>
+  <!-- The product layer is a transparent WebGL2 pane stacked on the identical
+       box as the road, running the identical shared camera. Its size must stay
+       pixel-for-pixel with the road iframe or the vehicle leaves the asphalt. -->
+  <iframe
+    class="product-scene active"
+    id="productScene"
+    data-product="bike"
+    src="bike-scene.embed.html?hud=0&amp;grid=0&amp;flat=1&amp;productLightning=0&amp;iso=bike&amp;cam=side&amp;t=999&amp;ride=wheelie"
+    title="אופניים חשמליים נוסעים ועוצרים בחריקה"
+    tabindex="-1"
+    loading="eager"
+    allowtransparency="true"
+    aria-hidden="true"
+  ></iframe>
+  <canvas id="fx" data-disabled="1" aria-hidden="true"></canvas>
+  <div class="grade"></div>
+  <div class="vignette"></div>
+  <div class="grain"></div>
+
+  <!-- Navigation -->
+  <nav class="site-nav" aria-label="ניווט ראשי">
+    <a class="brand" href="#home" aria-label="RIDE AND BIKE — דף הבית"><span class="spark"></span><span class="brand-txt">RIDE AND <b>BIKE</b></span></a>
+    <ul class="links">
+      <li><a href="electric-bikes.html">אופניים חשמליים</a></li>
+      <li><a href="electric-scooters.html">קורקינטים</a></li>
+      <li><a href="#experience">החוויה</a></li>
+      <li><a href="service.html">איך מזמינים</a></li>
+      <li><a href="#visit">החנות</a></li>
+    </ul>
+    <button class="cart-trigger" type="button" data-cart-trigger data-empty="true" aria-label="סל הקניות ריק"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.9 3.9h1.02a1.62 1.62 0 0 1 1.58 1.27l.31 1.44"/><path d="M6.12 7.55h13.2a1.25 1.25 0 0 1 1.22 1.55l-1.1 4.45a2.3 2.3 0 0 1-2.23 1.75H9.72a2.3 2.3 0 0 1-2.24-1.79L6.12 7.55Z"/><circle cx="10.15" cy="19.25" r="1.42" fill="currentColor" stroke="none"/><circle cx="16.9" cy="19.25" r="1.42" fill="currentColor" stroke="none"/></svg><span class="cart-label">הסל שלי</span><span class="cart-count">0</span></button>
+    <button class="menu-toggle" type="button" aria-label="פתיחת תפריט" aria-expanded="false" aria-controls="mobileNav"><span></span><span></span></button>
+    <div class="mobile-menu" id="mobileNav">
+      <a href="electric-bikes.html">אופניים חשמליים</a>
+      <a href="electric-scooters.html">קורקינטים חשמליים</a>
+      <a href="#experience">החוויה</a>
+      <a href="service.html">איך מזמינים</a>
+      <a href="#visit">החנות בראשון לציון</a>
+    </div>
+  </nav>
+
+  <!-- Hero content -->
+  <div class="stage">
+    <div class="glow-pool"></div>
+    <div class="impact-flash" aria-hidden="true"></div>
+    <div class="skid-trail" aria-hidden="true"></div>
+    <div class="crash-message ride-speech" role="status" aria-live="polite" aria-atomic="true">
+      <span class="oops" data-ride-speech-kicker>האופניים אומרים</span>
+      <strong data-ride-speech-title>הדרך פתוחה. רק תבחרו לאן.</strong>
+      <p data-ride-speech-body>אני מכוון, בדוק ומוכן למסירה — אתם רק עולים ורוכבים.</p>
+      <div class="ride-speech-actions" data-ride-speech-actions hidden>
+        <a class="ride-speech-buy" href="#shop" data-ride-speech-buy>לחנות האונליין</a>
+        <a class="ride-speech-alt" href="#" data-ride-speech-alt>נסיעת מבחן</a>
+      </div>
+      <span class="ride-contact-pin" aria-hidden="true"></span>
+    </div>
+    <div class="product" aria-label="תצוגת מוצר מתחלפת">
+      <div class="product-switcher" role="tablist" aria-label="בחירת כלי לתצוגה">
+        <button type="button" role="tab" data-product-tab="bike" aria-selected="true">אופניים</button>
+        <button type="button" role="tab" data-product-tab="scooter" aria-selected="false">קורקינט</button>
+      </div>
+    </div>
+    <div class="copy">
+      <span class="eyebrow">RIDE AND BIKE · ראשון לציון</span>
+      <h1><span class="shine">הדרך שלך.<br>הכלי שלך.<br>הקצב שלך.</span></h1>
+      <p class="lead">
+        בוחרים אופניים או קורקינט, מוסיפים לסל ומקבלים במשלוח עד הבית או באיסוף
+        עצמי ממרכז ראשון לציון.
+      </p>
+      <div class="actions">
+        <a class="btn-primary" href="#shop">קונים עכשיו</a>
+        <a class="btn-testride" href="test-ride.html">
+          <span class="tr-dot" aria-hidden="true"></span> נסיעת מבחן
+        </a>
+        <button class="btn-ghost" type="button" id="sceneReplay">
+          <span class="play" aria-hidden="true">↻</span> הפעילו מחדש
+        </button>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="num">תשלום בטוח</div><div class="lbl">לאחר אימות מלאי</div></div>
+        <div class="stat"><div class="num">משלוח מהיר</div><div class="lbl">עד פתח הבית</div></div>
+        <div class="stat"><div class="num">איסוף עצמי</div><div class="lbl">מרכז ראשון לציון</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="scroll"><span>גלול</span><span class="mouse"></span></div>
+</section>
+
+<section class="trust-strip" aria-label="היתרונות של RIDE AND BIKE">
+  <div class="section-shell trust-grid">
+    <div class="trust-item"><span class="trust-mark">01</span><div><strong>קנייה אונליין</strong><span>מחיר, מפרט והוספה לסל.</span></div></div>
+    <div class="trust-item"><span class="trust-mark">02</span><div><strong>משלוח עד הבית</strong><span>חינם בקנייה מעל ₪2,500.</span></div></div>
+    <div class="trust-item"><span class="trust-mark">03</span><div><strong>איסוף עצמי</strong><span>ממרכז ראשון לציון.</span></div></div>
+  </div>
+</section>
+
+<!-- ===================== CATEGORIES ===================== -->
+<section class="home-shop" id="shop">
+  <div class="section-shell">
+    <div class="home-shop-head"><div><span class="section-kicker">SHOP ONLINE</span><h2 class="section-title">בוחרים.<br>מוסיפים לסל.</h2></div><p class="section-copy">דגמים נבחרים עם מחיר ברור, מפרט קצר והזמנה ישירה. לפני חיוב אנחנו מאמתים את הצבע, הגרסה והמלאי.</p></div>
+    <div class="home-product-grid">
+      <article class="home-product-card"><div class="home-product-visual"><span class="home-sale">דגם דגל</span><img src="electricbike.png" alt="אופניים חשמליים MASTER MAX" loading="lazy"></div><div class="home-product-body"><span class="home-product-brand">KALOFUN</span><h3>MASTER MAX</h3><p>שיכוך כפול, פאט 20×4 וסוללת 48V/17.5Ah.</p><div class="home-product-specs"><span>עד 40 ק״מ</span><span>בלמים הידראוליים</span></div><div class="product-price"><strong>₪5,999</strong></div><div class="home-product-actions"><a href="product.html?id=master-max">לפרטים</a><button class="add-cart-btn" type="button" data-add-cart="master-max">הוספה לסל</button></div></div></article>
+      <article class="home-product-card"><div class="home-product-visual"><span class="home-sale">16% הנחה</span><img src="electricbike.png" alt="אופניים חשמליים BIG Dog RoadStar" loading="lazy"></div><div class="home-product-body"><span class="home-product-brand">GREENBIKE</span><h3>BIG Dog RoadStar</h3><p>מיני־פאט מתקפל, 48V/15Ah וטווח יצרן ארוך.</p><div class="home-product-specs"><span>עד 70 ק״מ</span><span>מתקפלים</span></div><div class="product-price"><strong>₪4,190</strong><del>₪4,990</del></div><div class="home-product-actions"><a href="product.html?id=big-dog-roadstar">לפרטים</a><button class="add-cart-btn" type="button" data-add-cart="big-dog-roadstar">הוספה לסל</button></div></div></article>
+      <article class="home-product-card"><div class="home-product-visual"><span class="home-sale">11 אינץ׳</span><img src="scooter.png" alt="קורקינט חשמלי ICON 11" loading="lazy"></div><div class="home-product-body"><span class="home-product-brand">GREENBIKE</span><h3>ICON 11</h3><p>גלגלי 11 אינץ׳, איתותים וסוללת 48V/12.5Ah.</p><div class="home-product-specs"><span>עד 50 ק״מ</span><span>17.5 ק״ג</span></div><div class="product-price"><strong>₪2,990</strong><del>₪3,290</del></div><div class="home-product-actions"><a href="product.html?id=icon-11">לפרטים</a><button class="add-cart-btn" type="button" data-add-cart="icon-11">הוספה לסל</button></div></div></article>
+      <article class="home-product-card"><div class="home-product-visual"><span class="home-sale">26% הנחה</span><img src="scooter.png" alt="קורקינט חשמלי Punk Rider" loading="lazy"></div><div class="home-product-body"><span class="home-product-brand">GREENBIKE</span><h3>Punk Rider</h3><p>תאורה היקפית, אפליקציה ושיכוך מלא לנסיעות ארוכות.</p><div class="home-product-specs"><span>עד 65 ק״מ</span><span>48V/15.6Ah</span></div><div class="product-price"><strong>₪3,790</strong><del>₪5,090</del></div><div class="home-product-actions"><a href="product.html?id=punk-rider">לפרטים</a><button class="add-cart-btn" type="button" data-add-cart="punk-rider">הוספה לסל</button></div></div></article>
+    </div>
+    <div class="shop-all"><a href="electric-bikes.html">כל האופניים</a><a href="electric-scooters.html">כל הקורקינטים</a></div>
+  </div>
+</section>
+
+<!-- ===================== CATEGORIES ===================== -->
+<section class="cats" id="categories">
+  <div class="cats-head">
+    <div>
+      <span class="eyebrow">הקטגוריות שלנו</span>
+      <h2>כל מה שצריך<br>כדי <em>לזוז קדימה</em></h2>
+    </div>
+    <p>מבחר מדויק של אופניים, כלים חשמליים ואביזרים — כדי שתוכלו לבחור לפי הדרך, הקצב והסגנון שלכם.</p>
+  </div>
+
+  <div class="cats-grid">
+
+    <!-- אופניים רגילות -->
+    <a class="cat" href="#visit">
+      <span class="idx">01</span>
+      <div class="cat-img"><img src="regularbike.png" alt="אופניים רגילות" loading="lazy" /></div>
+      <h3>אופניים רגילות</h3>
+      <p class="desc">רכיבה קלאסית, מסגרות קלות וביצועים אמינים לכל יום בעיר ובשטח.</p>
+      <span class="go">מחכה לכם בחנות <span class="arr">«</span></span>
+    </a>
+
+    <!-- אופניים חשמליות -->
+    <a class="cat" href="electric-bikes.html">
+      <span class="idx">02</span>
+      <div class="cat-img"><img src="electricbike.png" alt="אופניים חשמליות" loading="lazy" /></div>
+      <h3>אופניים חשמליות</h3>
+      <p class="desc">מנוע עוצמתי, סוללה לטווח ארוך ותאוצה חלקה — הדרך החכמה לנוע.</p>
+      <span class="go">לכל הדגמים והמסננים <span class="arr">«</span></span>
+    </a>
+
+    <!-- קורקינטים חשמליים -->
+    <a class="cat" href="electric-scooters.html">
+      <span class="idx">03</span>
+      <div class="cat-img"><img src="scooter.png" alt="קורקינטים חשמליים" loading="lazy" /></div>
+      <h3>קורקינטים חשמליים</h3>
+      <p class="desc">מתקפלים, קלים וזריזים — ניידות אורבנית מושלמת לקילומטר האחרון.</p>
+      <span class="go">לכל הדגמים והמסננים <span class="arr">«</span></span>
+    </a>
+
+    <!-- אביזרים -->
+    <a class="cat" href="#visit">
+      <span class="idx">04</span>
+      <div class="cat-img"><img src="acc.png" alt="אביזרים" loading="lazy" /></div>
+      <h3>אביזרים</h3>
+      <p class="desc">קסדות, מנעולים, תאורה ותוספות פרימיום — כל מה שישלים את הרכיבה.</p>
+      <span class="go">מחכה לכם בחנות <span class="arr">«</span></span>
+    </a>
+
+  </div>
+</section>
+
+<!-- ===================== BRAND EXPERIENCE ===================== -->
+<section class="manifesto" id="experience">
+  <div class="section-shell manifesto-grid">
+    <div class="manifesto-copy" data-reveal="right">
+      <span class="section-kicker">קטלוג אחד. כל הדרך.</span>
+      <h2 class="section-title">בוחרים באתר.<br><em>אנחנו מכינים.</em></h2>
+      <p class="section-copy">
+        משווים מפרטים ומחירים, מוסיפים לסל ובוחרים מסירה. כל כלי עובר הכנה ובדיקת QA
+        לפני משלוח או איסוף עצמי.
+      </p>
+      <div class="manifesto-line"></div>
+      <p class="manifesto-note">RIDE AND BIKE · קנייה אונליין עם כתובת מקומית אמיתית.</p>
+    </div>
+    <figure class="manifesto-visual" data-reveal="left">
+      <span class="visual-tag">BUILT TO MOVE</span>
+      <img src="home-commerce-duo-v3.png" alt="אופניים וקורקינט שחורים וזהובים בסטודיו צהוב" loading="lazy" />
+    </figure>
+  </div>
+</section>
+
+<!-- ===================== SERVICE ===================== -->
+<section class="quality-feature" aria-label="איכות והכנה לפני מסירה">
+  <div class="quality-photo" role="img" aria-label="תקריב של פנס, מזלג וגלגל באופניים חשמליים"></div>
+  <div class="quality-copy"><div class="quality-copy-inner"><span class="section-kicker">CHECKED BEFORE DELIVERY</span><h2>כל פרט.<br><span>לפני המסירה.</span></h2><p>ההזמנה לא יוצאת מהחנות לפני שעברנו על מערכות החשמל, הבלמים, לחץ האוויר ונקודות המגע.</p><div class="quality-points"><div class="quality-point"><strong>בדיקת QA</strong><span>מערכות, ברגים ובלימה</span></div><div class="quality-point"><strong>אחריות מלאה</strong><span>לפי תנאי היבואן והדגם</span></div><div class="quality-point"><strong>כיוון ראשוני</strong><span>כלי שמוכן ליציאה</span></div><div class="quality-point"><strong>שירות מקומי</strong><span>כתובת במרכז ראשון לציון</span></div></div></div></div>
+</section>
+
+<!-- ===================== SERVICE ===================== -->
+<section class="care" id="service">
+  <div class="section-shell">
+    <div class="care-head">
+      <div data-reveal>
+        <span class="section-kicker">ארבעה שלבים · הזמנה אחת חלקה</span>
+        <h2 class="section-title">ארבעה שלבים.<br>הזמנה אחת חלקה.</h2>
+      </div>
+      <p class="section-copy" data-reveal>
+        בנינו תהליך איקומרס שלא משאיר סימני שאלה: בוחרים, מדייקים, משלמים ומקבלים כלי שעבר הכנה לפני המסירה.
+      </p>
+    </div>
+    <div class="care-grid">
+      <article class="care-card" data-reveal>
+        <span class="care-index">01 · CHOOSE</span>
+        <div class="care-art care-webgl" aria-label="אופניים חשמליים בתצוגת Three.js WebGL2 חיה">
+          <iframe id="choiceScene" src="bike-scene.embed.html?hud=0&amp;grid=0&amp;flat=1&amp;productLightning=0&amp;iso=bike&amp;cam=side&amp;t=999&amp;ride=showcase&amp;fit=1.18&amp;dpr=1.25" title="אופניים חשמליים בתלת־ממד בתצוגת אופנה מסתובבת" loading="lazy" allowtransparency="true" tabindex="-1"></iframe>
+          <span class="care-live-badge">תצוגה חיה</span>
+        </div>
+        <h3>בוחרים את הכלי</h3>
+        <p>מחפשים, מסננים ומשווים לפי טווח, מבנה, משקל ואופי השימוש — עד שנשארות האפשרויות הנכונות.</p>
+      </article>
+      <article class="care-card" data-reveal>
+        <span class="care-index">02 · MATCH</span>
+        <img class="care-art" src="service-match.svg" alt="עגלת קניות עם ציוד רכיבה וסוללה" loading="lazy" />
+        <h3>מתאימים ומוסיפים</h3>
+        <p>בוחרים גרסה, צבע ואביזרים ומקבלים סיכום ברור לפני התשלום.</p>
+      </article>
+      <article class="care-card" data-reveal>
+        <span class="care-index">03 · PAY</span>
+        <img class="care-art" src="service-tune.svg" alt="מסוף תשלום עם מגן ואישור אבטחה" loading="lazy" />
+        <h3>משלמים בבטחה</h3>
+        <p>מאשרים את ההזמנה ואת דרך המסירה בסביבת תשלום מאובטחת.</p>
+      </article>
+      <article class="care-card" data-reveal>
+        <span class="care-index">04 · RIDE</span>
+        <img class="care-art" src="service-care.svg" alt="חבילת משלוח בתנועה עם סיכת יעד" loading="lazy" />
+        <h3>מקבלים ויוצאים</h3>
+        <p>הכלי עובר הכנה ובדיקה, ואז יוצא למשלוח או מחכה לאיסוף.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== LOCATION ===================== -->
+<section class="fulfillment" id="delivery">
+  <div class="section-shell fulfillment-grid"><figure class="fulfillment-photo" data-reveal="right"><img src="home-delivery-v3.png" alt="קורקינט ואריזת אופניים מוכנים למשלוח" loading="lazy"></figure><div class="fulfillment-copy" data-reveal="left"><span class="section-kicker">DELIVERY OR PICKUP</span><h2>עד הבית.<br><span>או מחכים לכם.</span></h2><p>ב־Checkout בוחרים את הדרך שנוחה לכם. משלוח מוגן עד הבית, או איסוף עצמי ללא עלות ממרכז ראשון לציון.</p><div class="fulfillment-choices"><div class="fulfillment-choice"><strong>משלוח עד הבית</strong><span>חינם בהזמנה מעל ₪2,500</span></div><div class="fulfillment-choice"><strong>איסוף עצמי</strong><span>ללא עלות · אחרי הודעת “מוכן”</span></div></div><a class="btn-primary" href="#shop">לבחירת כלי</a></div></div>
+</section>
+
+<!-- ===================== LOCATION ===================== -->
+<section class="visit" id="visit">
+  <div class="section-shell visit-grid">
+    <div data-reveal="right">
+      <span class="section-kicker">הבית של הרכיבה בעיר</span>
+      <h2 class="section-title">ראשון<br>לציון.</h2>
+      <p class="visit-copy">
+        החנות שלנו במרכז העיר היא גם נקודת האיסוף והשירות שלכם. מזמינים באתר,
+        מקבלים עדכון כשהכלי מוכן ובאים לאסוף בלי להמתין.
+      </p>
+      <div class="visit-actions">
+        <a class="visit-btn dark" href="https://www.google.com/maps/search/?api=1&amp;query=מרכז+העיר+ראשון+לציון" target="_blank" rel="noopener">הצגת האזור במפה <span aria-hidden="true">↗</span></a>
+        <a class="visit-btn light" href="checkout.html">לסיום ההזמנה</a>
+      </div>
+    </div>
+    <div class="location-card" data-reveal="left">
+      <div class="location-top"><span>RISHON LEZION</span><span>CITY CENTER</span></div>
+      <div class="location-pin" aria-hidden="true"></div>
+      <h3>RIDE AND BIKE</h3>
+      <p>מרכז העיר · ראשון לציון</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== CLOSING ===================== -->
+<section class="closing">
+  <div class="section-shell closing-inner" data-reveal>
+    <span class="closing-mark">RIDE AND BIKE</span>
+    <h2>לא רק להגיע.<br><span>ליהנות מהדרך.</span></h2>
+    <p>בוחרים את הכלי, מוסיפים לסל ומחליטים אם לקבל בבית או לאסוף מראשון לציון.</p>
+    <a class="btn-primary" href="#shop">מתחילים לקנות</a>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="section-shell">
+    <div class="footer-main">
+      <div>
+        <div class="footer-brand">RIDE AND <span>BIKE</span></div>
+        <p class="footer-about">חנות אונליין לאופניים וקורקינטים עם משלוח, איסוף עצמי ושירות מקומי בראשון לציון.</p>
+      </div>
+      <div class="footer-col">
+        <h3>ניווט</h3>
+        <a href="electric-bikes.html">אופניים חשמליים</a>
+        <a href="electric-scooters.html">קורקינטים חשמליים</a>
+        <a href="#experience">החוויה</a>
+        <a href="service.html">איך מזמינים</a>
+      </div>
+      <div class="footer-col">
+        <h3>בואו לבקר</h3>
+        <p>מרכז העיר</p>
+        <p>ראשון לציון</p>
+        <a href="https://www.google.com/maps/search/?api=1&amp;query=מרכז+העיר+ראשון+לציון" target="_blank" rel="noopener">הצגת האזור במפה ↗</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© <span id="year"></span> RIDE AND BIKE</span>
+      <span>קונים אונליין. מקבלים כמו שצריך.</span>
+    </div>
+  </div>
+</footer>
+
+<script src="catalog-data.js"></script>
+<script src="commerce.js"></script>
+<script>
+/* =========================================================
+   WebGL fragment shader — black & gold marble + gold lightning
+   Domain-warped fractal Brownian motion creates the flowing
+   marble veins; animated electric arcs add the lightning;
+   a reflective "wet floor" mirrors the lower half.
+   ========================================================= */
+(function(){
+  const canvas = document.getElementById('fx');
+  if(!canvas || canvas.dataset.disabled === '1') return;
+  const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+  if(!gl){ canvas.style.background = '#080808'; return; }
+
+  const vsrc = `
+    attribute vec2 p;
+    void main(){ gl_Position = vec4(p,0.0,1.0); }
+  `;
+
+  const fsrc = `
+    precision highp float;
+    uniform vec2  u_res;
+    uniform float u_time;
+    uniform vec2  u_mouse;
+
+    // -- hash / value noise --
+    float hash(vec2 p){
+      p = fract(p*vec2(123.34,456.21));
+      p += dot(p,p+45.32);
+      return fract(p.x*p.y);
+    }
+    float noise(vec2 p){
+      vec2 i = floor(p), f = fract(p);
+      vec2 u = f*f*(3.0-2.0*f);
+      float a = hash(i+vec2(0,0));
+      float b = hash(i+vec2(1,0));
+      float c = hash(i+vec2(0,1));
+      float d = hash(i+vec2(1,1));
+      return mix(mix(a,b,u.x),mix(c,d,u.x),u.y);
+    }
+    float fbm(vec2 p){
+      float v = 0.0, a = 0.5;
+      mat2 m = mat2(1.6,1.2,-1.2,1.6);
+      for(int i=0;i<6;i++){
+        v += a*noise(p);
+        p = m*p;
+        a *= 0.5;
+      }
+      return v;
+    }
+
+    // ---------------------------------------------------------
+    //  Realistic lightning
+    // ---------------------------------------------------------
+
+    // Jagged, sharply-kinked horizontal offset of a bolt at height y.
+    // The shape "snaps" to a new silhouette in discrete steps (floor on
+    // time) like a real strike re-igniting, instead of smoothly sliding.
+    float boltPath(float y, float seed, float t){
+      float x = 0.0;
+      float amp = 0.13;
+      float f   = 2.2;
+      float jitter = floor(t*9.0)*0.137;      // discrete re-strike jitter
+      for(int i=0;i<6;i++){
+        float n = noise(vec2(y*f + seed*7.31, jitter + seed*3.0));
+        x += (n*2.0-1.0)*amp;                 // signed kink
+        amp *= 0.52;
+        f   *= 2.07;
+      }
+      return x;
+    }
+
+    // Distance-field glow of one bolt: a hot thin core wrapped in bloom,
+    // tapered so it fades into the ceiling and floor.
+    float boltGlow(vec2 uv, float baseX, float seed, float t, out float core){
+      float path = baseX + boltPath(uv.y, seed, t);
+      float d = abs(uv.x - path);
+      core     = 0.0016 / (d + 0.0011);       // white-hot filament
+      float halo = 0.011 / (d*d*40.0 + 0.05); // soft amber bloom
+      float taper = smoothstep(0.0,0.12,uv.y) * smoothstep(1.0,0.82,uv.y);
+      core *= taper;
+      return (core + halo*0.6) * taper;
+    }
+
+    // Strike envelope — not every cycle fires, and when it does it
+    // flickers a few times rapidly then decays (classic stroboscopic
+    // lightning behaviour).
+    float strike(float seed, float t){
+      float period = 1.9;
+      float ph  = t/period + seed*4.17;
+      float idx = floor(ph);
+      float r   = hash(vec2(idx, seed*9.0));
+      if(r < 0.40) return 0.0;                // many cycles stay dark
+      float local = fract(ph);
+      float decay = exp(-local*6.5);
+      float flick = 0.55 + 0.45*sin(local*55.0 + r*30.0); // multi-flash
+      return max(decay*flick, 0.0);
+    }
+
+    void main(){
+      vec2 uv = gl_FragCoord.xy / u_res.xy;
+      vec2 p  = uv;
+      p.x *= u_res.x / u_res.y;
+
+      float t = u_time*0.05;
+
+      // -- domain warped marble --
+      vec2 q = vec2( fbm(p + vec2(0.0,t)),
+                     fbm(p + vec2(5.2,1.3 - t)) );
+      vec2 r = vec2( fbm(p + 3.0*q + vec2(1.7,9.2) + 0.15*t),
+                     fbm(p + 3.0*q + vec2(8.3,2.8) - 0.12*t) );
+      float marble = fbm(p + 3.5*r);
+
+      // crisp gold veins from the warped field
+      float veins = abs(2.0*r.x - 1.0);
+      veins = pow(1.0 - smoothstep(0.0,0.18,veins), 2.5);
+
+      // base black-marble body
+      vec3 dark = mix(vec3(0.015,0.015,0.02), vec3(0.06,0.05,0.045), marble);
+      dark += vec3(0.10,0.09,0.10)*pow(marble,4.0);   // white-ish silver glints
+
+      // gold colour ramp
+      vec3 gold = mix(vec3(0.55,0.34,0.02), vec3(1.0,0.86,0.32), veins);
+
+      vec3 col = mix(dark, gold, veins*0.9);
+
+      // -- realistic gold lightning (concentrated upper-left, like the ref) --
+      // Each bolt = a main channel + a thinner forked branch, with its own
+      // strike timing. Glow accumulates separately from the white core so we
+      // can colour-grade hot cores toward white and bloom toward amber.
+      float glow = 0.0;     // total amber bloom
+      float hot  = 0.0;     // total white-hot core
+      float fired = 0.0;    // sum of active strike envelopes (for ambient flash)
+
+      // base x positions of the main bolts (left-weighted)
+      const int NB = 3;
+      for(int i=0;i<NB;i++){
+        float fi   = float(i);
+        float seed = fi*1.91 + 0.3;
+        float s    = strike(seed, u_time);
+        if(s <= 0.001) continue;
+        fired += s;
+
+        float baseX = 0.16 + fi*0.13;                 // main channel
+        float c; float g = boltGlow(uv, baseX, seed, u_time, c);
+        glow += g * s;  hot += c * s;
+
+        // a forked branch peeling off the main channel
+        float bseed = seed + 5.0;
+        float bc;
+        float bx = baseX + 0.07 + 0.05*sin(seed*3.0);
+        float bg = boltGlow(uv, bx, bseed, u_time, bc);
+        float bmask = smoothstep(0.65,0.35,uv.y);     // branch lives mid/low
+        glow += bg * s * 0.55 * bmask;
+        hot  += bc * s * 0.55 * bmask;
+      }
+
+      // left-weighted falloff so bolts originate from the lit side
+      float lmask = smoothstep(1.05, 0.05, uv.x);
+      glow *= lmask;  hot *= lmask;
+
+      // colour: amber bloom, white-hot filament core
+      vec3 amber = vec3(1.0, 0.74, 0.22);
+      vec3 white = vec3(1.0, 0.97, 0.86);
+      col += amber * glow * 0.9;
+      col += white * hot  * 1.3;
+
+      // ambient flash — the whole cavern lights up while a bolt is live
+      float flash = clamp(fired, 0.0, 1.5);
+      col += vec3(0.95,0.78,0.34) * flash * 0.06 * lmask;
+
+      // big soft gold light source upper-left (matches reference)
+      float key = smoothstep(0.9,0.0,distance(uv,vec2(0.16,0.78)));
+      col += vec3(0.9,0.7,0.22) * key * (0.32 + 0.12*flash);
+
+      // -- wet reflective floor (mirror lower ~26%) --
+      if(uv.y < 0.26){
+        vec2 ruv = vec2(uv.x, 0.52 - uv.y);  // reflect
+        ruv.x += 0.012*sin(uv.x*40.0 + u_time*1.2); // ripple
+        vec2 rp = ruv; rp.x *= u_res.x/u_res.y;
+        vec2 rq = vec2(fbm(rp+vec2(0.0,t)),fbm(rp+vec2(5.2,1.3-t)));
+        float rvein = pow(1.0-smoothstep(0.0,0.2,abs(2.0*rq.x-1.0)),2.5);
+        vec3 refl = mix(vec3(0.01),vec3(1.0,0.82,0.28),rvein);
+        float fade = smoothstep(0.0,0.26,uv.y);
+        col = mix(refl*1.1, col, fade);
+        col += vec3(0.9,0.72,0.25)*rvein*(1.0-fade)*0.5;
+
+        // reflect the live lightning onto the wet floor (smeared by ripples)
+        float rGlow=0.0;
+        for(int i=0;i<NB;i++){
+          float fi=float(i); float seed=fi*1.91+0.3;
+          float s=strike(seed,u_time);
+          if(s<=0.001) continue;
+          float c; float g=boltGlow(ruv,0.16+fi*0.13,seed,u_time,c);
+          rGlow += (g+c)*s;
+        }
+        rGlow *= smoothstep(1.05,0.05,uv.x) * (1.0-fade);
+        col += vec3(1.0,0.80,0.30) * rGlow * 0.7;
+      }
+
+      // mouse interactive spark glow
+      float md = distance(uv, u_mouse);
+      col += vec3(1.0,0.84,0.34) * (0.05/(md+0.08)) * 0.25;
+
+      // gentle vignette + tone
+      float vig = smoothstep(1.25,0.25,distance(uv,vec2(0.5)));
+      col *= mix(0.35,1.0,vig);
+      col = pow(col, vec3(0.85));   // lift
+
+      gl_FragColor = vec4(col,1.0);
+    }
+  `;
+
+  function compile(type,src){
+    const s = gl.createShader(type);
+    gl.shaderSource(s,src); gl.compileShader(s);
+    if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))
+      console.error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  const prog = gl.createProgram();
+  gl.attachShader(prog,compile(gl.VERTEX_SHADER,vsrc));
+  gl.attachShader(prog,compile(gl.FRAGMENT_SHADER,fsrc));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1, 3,-1, -1,3]),gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog,'p');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+
+  const uRes  = gl.getUniformLocation(prog,'u_res');
+  const uTime = gl.getUniformLocation(prog,'u_time');
+  const uMouse= gl.getUniformLocation(prog,'u_mouse');
+
+  let mouse = [0.7,0.6];
+  window.addEventListener('mousemove',e=>{
+    mouse = [e.clientX/window.innerWidth, 1.0 - e.clientY/window.innerHeight];
+  });
+
+  function resize(){
+    // lower the render resolution on phones to save battery / keep 60fps
+    const cap = window.innerWidth < 700 ? 1.25 : 1.75;
+    const dpr = Math.min(window.devicePixelRatio||1, cap);
+    canvas.width  = Math.floor(window.innerWidth*dpr);
+    canvas.height = Math.floor(window.innerHeight*dpr);
+    canvas.style.width = window.innerWidth+'px';
+    canvas.style.height= window.innerHeight+'px';
+    gl.viewport(0,0,canvas.width,canvas.height);
+  }
+  window.addEventListener('resize',resize);
+  resize();
+
+  const start = performance.now();
+  function frame(){
+    const t = (performance.now()-start)/1000;
+    gl.uniform2f(uRes, canvas.width, canvas.height);
+    gl.uniform1f(uTime, t);
+    gl.uniform2f(uMouse, mouse[0], mouse[1]);
+    gl.drawArrays(gl.TRIANGLES,0,3);
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+/* ---- staggered scroll-reveal for category cards ---- */
+(function(){
+  const cards = document.querySelectorAll('.cat');
+  if(!('IntersectionObserver' in window)){
+    cards.forEach(c=>c.classList.add('in')); return;
+  }
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){
+        const i = [...cards].indexOf(e.target);
+        e.target.style.transitionDelay = (i*0.1)+'s';
+        e.target.classList.add('in');
+        io.unobserve(e.target);
+      }
+    });
+  },{threshold:0.2});
+  cards.forEach(c=>io.observe(c));
+})();
+
+/* ---- premium navigation, reveal and scene controls ---- */
+(function(){
+  const nav = document.querySelector('.site-nav');
+  const menuButton = document.querySelector('.menu-toggle');
+  const mobileMenu = document.querySelector('.mobile-menu');
+  const sceneFrame = document.getElementById('productScene');
+  const choiceFrame = document.getElementById('choiceScene');
+  const roadFrame = document.getElementById('roadScene');
+  const heroStage = document.querySelector('.hero .stage');
+  const productTabs = [...document.querySelectorAll('[data-product-tab]')];
+  const replayButton = document.getElementById('sceneReplay');
+  const impactFlash = document.querySelector('.hero .impact-flash');
+  const crashMessage = document.querySelector('.hero .crash-message');
+  const speechKicker = crashMessage?.querySelector('[data-ride-speech-kicker]');
+  const speechTitle = crashMessage?.querySelector('[data-ride-speech-title]');
+  const speechBody = crashMessage?.querySelector('[data-ride-speech-body]');
+  const skidTrail = document.querySelector('.hero .skid-trail');
+  const heroCopy = document.querySelector('.hero .copy');
+  const speechActions = crashMessage?.querySelector('[data-ride-speech-actions]');
+  const speechBuy = crashMessage?.querySelector('[data-ride-speech-buy]');
+  const speechAlt = crashMessage?.querySelector('[data-ride-speech-alt]');
+  const year = document.getElementById('year');
+
+  const syncNav = () => nav && nav.classList.toggle('scrolled', window.scrollY > 24);
+  syncNav();
+  window.addEventListener('scroll', syncNav, {passive:true});
+
+  const closeMenu = () => {
+    if(!menuButton || !mobileMenu) return;
+    menuButton.setAttribute('aria-expanded','false');
+    menuButton.setAttribute('aria-label','פתיחת תפריט');
+    mobileMenu.classList.remove('open');
+  };
+  if(menuButton && mobileMenu){
+    menuButton.addEventListener('click',()=>{
+      const willOpen = menuButton.getAttribute('aria-expanded') !== 'true';
+      menuButton.setAttribute('aria-expanded',String(willOpen));
+      menuButton.setAttribute('aria-label',willOpen ? 'סגירת תפריט' : 'פתיחת תפריט');
+      mobileMenu.classList.toggle('open',willOpen);
+    });
+    mobileMenu.querySelectorAll('a').forEach(link=>link.addEventListener('click',closeMenu));
+    document.addEventListener('keydown',e=>{ if(e.key === 'Escape') closeMenu(); });
+  }
+
+  const revealItems = document.querySelectorAll('[data-reveal]');
+  if(!('IntersectionObserver' in window)){
+    revealItems.forEach(item=>item.classList.add('revealed'));
+  }else{
+    const revealObserver = new IntersectionObserver(entries=>{
+      entries.forEach(entry=>{
+        if(entry.isIntersecting){
+          entry.target.classList.add('revealed');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    },{threshold:.12,rootMargin:'0px 0px -8% 0px'});
+    revealItems.forEach(item=>revealObserver.observe(item));
+  }
+
+  let productIndex = 0;
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const messageOrigin = location.origin === 'null' ? '*' : location.origin;
+  let rideSessionCounter = 0;
+  let activeRideSession = '';
+  let choiceRideSession = '';
+  let sceneLoaded = false;
+  // The vehicle brakes hard and slides to a stop inside the hero, so the
+  // bubble is the reaction to that stop, not a generic tagline.
+  /* Two beats. The skid earns attention; the parked pose asks for the sale.
+     The vehicle is the salesperson here, so the second beat is a question
+     with the answer one tap away. */
+  const rideSpeech = {
+    bike: {
+      arrival: {
+        kicker: 'אופס… האופניים בלמו',
+        title: 'עצרתי בול לפניכם.',
+        body: 'בלמים הידראוליים, פאט 20×4 וסוללת 48V — הכול שלם.'
+      },
+      offer: {
+        kicker: 'האופניים שואלים',
+        title: 'באיזה דגם אתם בוחרים?',
+        body: 'שנרד לחנות האונליין ונסגור הזמנה? משלוח עד הבית או איסוף מראשון לציון.',
+        buy: 'לחנות האונליין',
+        buyHref: '#shop',
+        alt: 'נסיעת מבחן',
+        altHref: 'test-ride.html'
+      }
+    },
+    scooter: {
+      arrival: {
+        kicker: 'אופס… הקורקינט בלם',
+        title: 'נבלמתי בדיוק בזמן.',
+        body: 'גלגלי 11 אינץ׳, שיכוך מלא ותאורה היקפית — מוכן לדרך.'
+      },
+      offer: {
+        kicker: 'הקורקינט שואל',
+        title: 'איזה קורקינט מתאים לכם?',
+        body: 'שנרד לחנות האונליין ונסגור הזמנה? משלוח עד הבית או איסוף מראשון לציון.',
+        buy: 'לחנות האונליין',
+        buyHref: '#shop',
+        alt: 'נסיעת מבחן',
+        altHref: 'test-ride.html'
+      }
+    }
+  };
+  const makeRideSession = prefix => `${prefix}-${Date.now()}-${++rideSessionCounter}`;
+  const postToFrame = (frame,message) => frame?.contentWindow?.postMessage(message,messageOrigin);
+  const syncRideSpeech = (product, beat = 'arrival') => {
+    const set = rideSpeech[product] || rideSpeech.bike;
+    const copy = set[beat] || set.arrival;
+    if(speechKicker) speechKicker.textContent = copy.kicker;
+    if(speechTitle) speechTitle.textContent = copy.title;
+    if(speechBody) speechBody.textContent = copy.body;
+    const selling = beat === 'offer';
+    if(speechActions){
+      speechActions.hidden = !selling;
+      if(selling){
+        if(speechBuy){ speechBuy.textContent = copy.buy; speechBuy.setAttribute('href', copy.buyHref); }
+        if(speechAlt){ speechAlt.textContent = copy.alt; speechAlt.setAttribute('href', copy.altHref); }
+      }
+    }
+  };
+  const positionRideSpeechAtContact = () => {
+    if(!heroStage || !sceneFrame || !crashMessage) return false;
+    const point = sceneFrame.contentWindow?.__scene?.getRideContactPoint?.();
+    if(!point || !point.visible || !Number.isFinite(point.u) || !Number.isFinite(point.v)){
+      crashMessage.classList.remove('ride-anchored');
+      return false;
+    }
+    const stageRect = heroStage.getBoundingClientRect();
+    const frameRect = sceneFrame.getBoundingClientRect();
+    // Layout dimensions are intentionally used here: getBoundingClientRect()
+    // includes the entrance scale and would move the contact pin when the
+    // animation settles from .94 to 1.
+    const bubbleWidth = crashMessage.offsetWidth;
+    const bubbleHeight = crashMessage.offsetHeight;
+    const contactX = frameRect.left - stageRect.left + point.u * frameRect.width;
+    const contactY = frameRect.top - stageRect.top + point.v * frameRect.height;
+    const edge = innerWidth <= 900 ? 20 : 28;
+    const minTop = innerWidth <= 900 ? 88 : 108;
+    const desiredLeft = contactX - bubbleWidth * .5;
+    const left = Math.min(
+      stageRect.width - bubbleWidth - edge,
+      Math.max(edge, desiredLeft)
+    );
+    // Phone heroes stack the CTA directly above the vehicle, so the tether
+    // is shortened rather than letting the bubble ride up over the button.
+    const tether = innerWidth <= 900 ? 22 : 40;
+    const maxTop = stageRect.height - bubbleHeight - edge;
+    let top = Math.min(maxTop, Math.max(minTop, contactY - bubbleHeight - tether));
+    // Tethering above the cockpit is the preferred read, but on the stacked
+    // phone layout the copy sits directly over the vehicle. Rather than
+    // permanently hiding the trust row behind the bubble, drop the bubble
+    // onto the empty asphalt below the vehicle and let proximity carry it.
+    const obstacle = heroCopy?.getBoundingClientRect();
+    const overlapsCopy = obstacle &&
+      left < obstacle.right - stageRect.left &&
+      left + bubbleWidth > obstacle.left - stageRect.left &&
+      top < obstacle.bottom - stageRect.top &&
+      top + bubbleHeight > obstacle.top - stageRect.top;
+    let below = false;
+    let side = false;
+    let placedLeft = left;
+    if(overlapsCopy){
+      /* Preferred fallback on wide layouts: step the bubble sideways into the
+         open half of the frame and run the tether across horizontally. The
+         vehicle now parks under the headline, so "above" is never free there,
+         and dropping the bubble below would push it off the bottom edge. */
+      const vehicleLeft = Number.isFinite(point.leftU)
+        ? frameRect.left - stageRect.left + point.leftU * frameRect.width
+        : contactX - 120;
+      const sideGap = 44;
+      const sideLeft = vehicleLeft - sideGap - bubbleWidth;
+      const sideTop = Math.min(maxTop, Math.max(minTop, contactY - bubbleHeight * .5));
+      const sideClearsCopy = !obstacle || sideLeft + bubbleWidth < obstacle.left - stageRect.left;
+      if(sideLeft >= edge && sideClearsCopy){
+        placedLeft = sideLeft;
+        top = sideTop;
+        side = true;
+      }
+    }
+    if(overlapsCopy && !side){
+      const vehicleBottom = Number.isFinite(point.bottomV)
+        ? frameRect.top - stageRect.top + point.bottomV * frameRect.height
+        : contactY + 120;
+      const belowTop = vehicleBottom + 10;
+      /* The switcher lives at the bottom of the hero and is the one control
+         the bubble must never bury — a taller selling bubble would otherwise
+         push straight down onto it. */
+      const switcher = heroStage.querySelector('.product-switcher');
+      const floor = switcher
+        ? Math.min(stageRect.height - 8,
+                   switcher.getBoundingClientRect().top - stageRect.top - 12)
+        : stageRect.height - 8;
+      if(belowTop + bubbleHeight <= floor){
+        top = belowTop;
+        below = true;
+      }else if(floor - bubbleHeight > minTop){
+        // Still better below than over the headline: sit on the floor instead.
+        top = floor - bubbleHeight;
+        below = true;
+      }
+    }
+    const pinX = Math.min(bubbleWidth - 24, Math.max(24, contactX - placedLeft));
+    const pinDrop = Math.max(18, contactY - top - bubbleHeight);
+    const pinY = Math.min(bubbleHeight - 22, Math.max(22, contactY - top));
+    const pinReach = Math.max(20, contactX - placedLeft - bubbleWidth);
+    crashMessage.style.setProperty('--speech-pin-y',`${pinY}px`);
+    crashMessage.style.setProperty('--speech-pin-reach',`${pinReach}px`);
+    crashMessage.style.left = `${placedLeft}px`;
+    crashMessage.style.right = 'auto';
+    crashMessage.style.top = `${top}px`;
+    crashMessage.style.setProperty('--speech-pin-x',`${pinX}px`);
+    crashMessage.style.setProperty('--speech-pin-drop',`${pinDrop}px`);
+    crashMessage.dataset.contactX = contactX.toFixed(2);
+    crashMessage.dataset.contactY = contactY.toFixed(2);
+    crashMessage.classList.add('ride-anchored');
+    crashMessage.classList.toggle('ride-anchored-below', below);
+    crashMessage.classList.toggle('ride-anchored-side', side);
+    return true;
+  };
+  // Both WebGL layers take the same jolt class so the road and the vehicle
+  // shake as one image.
+  const jolt = () => {
+    if(reducedMotion) return;
+    [roadFrame,sceneFrame].forEach(frame=>{
+      if(!frame) return;
+      frame.classList.remove('hero-jolt');
+      void frame.offsetWidth;
+      frame.classList.add('hero-jolt');
+    });
+  };
+  const clearJolt = () => [roadFrame,sceneFrame]
+    .forEach(frame=>frame?.classList.remove('hero-jolt'));
+  let speechSettleTimer = 0;
+  const showRideSpeech = beat => {
+    const product = productTabs[productIndex]?.dataset.productTab || 'bike';
+    syncRideSpeech(product, beat);
+    requestAnimationFrame(()=>{
+      requestAnimationFrame(()=>{
+        positionRideSpeechAtContact();
+        crashMessage?.classList.remove('ride-visible');
+        void crashMessage?.offsetWidth;
+        crashMessage?.classList.add('ride-visible');
+      });
+    });
+  };
+  const resetRideUI = () => {
+    clearInterval(speechSettleTimer);
+    clearJolt();
+    impactFlash?.classList.remove('ride-impact');
+    crashMessage?.classList.remove('ride-visible');
+    crashMessage?.classList.remove('ride-anchored');
+    crashMessage?.classList.remove('ride-anchored-below');
+    crashMessage?.classList.remove('ride-anchored-side');
+    crashMessage?.removeAttribute('style');
+    crashMessage?.removeAttribute('data-contact-x');
+    crashMessage?.removeAttribute('data-contact-y');
+    skidTrail?.classList.remove('ride-visible');
+    heroStage?.removeAttribute('data-ride-phase');
+    heroStage?.removeAttribute('data-ride-complete');
+  };
+  const prepareRide = () => {
+    if(!sceneFrame || !sceneLoaded || !activeRideSession) return;
+    const product = productTabs[productIndex].dataset.productTab;
+    postToFrame(sceneFrame,{
+      type:'ride-product',
+      product,
+      ride:product==='bike'?'wheelie':'cruise',
+      rideSessionId:activeRideSession
+    });
+  };
+  const showProduct = index => {
+    if(!sceneFrame || !productTabs.length) return;
+    if(activeRideSession){
+      postToFrame(sceneFrame,{type:'ride-stop',rideSessionId:activeRideSession});
+    }
+    productIndex = (index + productTabs.length) % productTabs.length;
+    const product = productTabs[productIndex].dataset.productTab;
+    sceneFrame.classList.remove('active');
+    resetRideUI();
+    activeRideSession = makeRideSession(product);
+    if(heroStage){
+      heroStage.dataset.ride = product;
+    }
+    syncRideSpeech(product);
+    sceneFrame.dataset.product = product;
+    sceneFrame.title = product === 'bike' ? 'אופניים חשמליים נוסעים ומרימים גלגל' : 'קורקינט חשמלי בתצוגה נפרדת';
+    productTabs.forEach((tab,i)=>tab.setAttribute('aria-selected',String(i===productIndex)));
+    prepareRide();
+  };
+  productTabs.forEach((tab,index)=>tab.addEventListener('click',()=>showProduct(index)));
+  sceneFrame?.addEventListener('load',()=>{
+    sceneLoaded = true;
+    prepareRide();
+  });
+  choiceFrame?.addEventListener('load',()=>{
+    choiceRideSession = makeRideSession('showcase');
+    postToFrame(choiceFrame,{
+      type:'ride-product',product:'bike',ride:'showcase',rideSessionId:choiceRideSession
+    });
+  });
+  window.addEventListener('message',event=>{
+    if(event.origin!==location.origin&&event.origin!=='null')return;
+    const data=event.data||{};
+    // The two WebGL layers cannot see each other's lights, so the hero relays
+    // the storm's strike energy from the road to the product.
+    if(data.type==='storm-flash'&&event.source===roadFrame?.contentWindow){
+      postToFrame(sceneFrame,data);
+      return;
+    }
+    if(event.source===choiceFrame?.contentWindow){
+      if(data.type==='ride-ready'&&data.rideSessionId===choiceRideSession){
+        postToFrame(choiceFrame,{
+          type:'ride-start',
+          rideSessionId:choiceRideSession,
+          startAtEpochMs:Date.now()+60
+        });
+      }
+      return;
+    }
+    if(event.source!==sceneFrame?.contentWindow||data.rideSessionId!==activeRideSession)return;
+    if(data.type==='ride-ready'){
+      sceneFrame.classList.add('active');
+      postToFrame(sceneFrame,{
+        type:'ride-start',
+        rideSessionId:activeRideSession,
+        startAtEpochMs:Date.now()+90
+      });
+    }else if(data.type==='ride-phase'){
+      heroStage?.setAttribute('data-ride-phase',data.phase||'');
+    }else if(data.type==='ride-event'){
+      if(reducedMotion){
+        // nothing to animate; the final pose still resolves on ride-complete
+      }else if(data.event==='landing-impact'){
+        impactFlash?.classList.remove('ride-impact');
+        void impactFlash?.offsetWidth;
+        impactFlash?.classList.add('ride-impact');
+      }else if(data.event==='skid-start'){
+        skidTrail?.classList.remove('ride-visible');
+        void skidTrail?.offsetWidth;
+        skidTrail?.classList.add('ride-visible');
+      }else if(data.event==='crash-impact'){
+        impactFlash?.classList.remove('ride-impact');
+        void impactFlash?.offsetWidth;
+        impactFlash?.classList.add('ride-impact');
+        jolt();
+        // Beat one: the reaction to the stop, while it is still where it slid.
+        showRideSpeech('arrival');
+      }else if(data.event==='show-moving'){
+        // Touring: the tether would whip across the frame, so the bubble
+        // holds its position and reads as a standalone card until it parks.
+        crashMessage?.classList.remove('ride-anchored');
+      }else if(data.event==='show-parked'){
+        positionRideSpeechAtContact();
+      }else if(data.event==='final-pose'){
+        heroStage?.setAttribute('data-ride-phase','collision-approach');
+      }
+    }else if(data.type==='ride-complete'){
+      heroStage?.setAttribute('data-ride-complete','true');
+      // Beat two: parked across the copy, now asking for the sale.
+      showRideSpeech('offer');
+      /* The parked pose is deliberately never static, so the tether has to
+         keep following the cockpit. A slow interval is enough: the idle
+         amplitude is millimetres, and re-measuring every frame would thrash
+         layout for no visible gain. */
+      clearInterval(speechSettleTimer);
+      speechSettleTimer = setInterval(()=>{
+        if(!crashMessage?.classList.contains('ride-visible')){
+          clearInterval(speechSettleTimer);
+          return;
+        }
+        // Only while parked: chasing the vehicle around its show lap would
+        // fling the bubble across the hero every few seconds.
+        if(crashMessage.classList.contains('ride-anchored')) positionRideSpeechAtContact();
+      },420);
+    }
+  });
+  showProduct(0);
+
+  if('IntersectionObserver' in window){
+    const sceneObserver = new IntersectionObserver(entries=>{
+      entries.forEach(entry=>entry.target.contentWindow?.postMessage({
+        type:'ride-scene-active',active:entry.isIntersecting
+      },messageOrigin));
+    },{threshold:.02,rootMargin:'0px'});
+    [sceneFrame,choiceFrame,roadFrame].filter(Boolean).forEach(frame=>sceneObserver.observe(frame));
+  }
+
+  if(replayButton && sceneFrame){
+    replayButton.addEventListener('click',()=>{
+      showProduct(productIndex);
+    });
+  }
+
+  let speechResizeFrame = 0;
+  window.addEventListener('resize',()=>{
+    if(!crashMessage?.classList.contains('ride-visible')) return;
+    cancelAnimationFrame(speechResizeFrame);
+    speechResizeFrame = requestAnimationFrame(positionRideSpeechAtContact);
+  },{passive:true});
+
+  if(year) year.textContent = new Date().getFullYear();
+})();
+</script>
+</body>
+</html>

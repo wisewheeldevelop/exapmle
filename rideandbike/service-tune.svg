@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 768" role="img" aria-labelledby="title desc">
+  <title id="title">תשלום מאובטח</title>
+  <desc id="desc">מסוף תשלום פרימיום, כרטיס ומגן עם סימן אישור</desc>
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff5ad"/><stop offset=".23" stop-color="#ffe15c"/><stop offset=".62" stop-color="#f5c518"/><stop offset="1" stop-color="#884900"/></linearGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#555c68"/><stop offset=".28" stop-color="#252930"/><stop offset=".74" stop-color="#08090c"/><stop offset="1" stop-color="#30353e"/></linearGradient>
+    <linearGradient id="side" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#171a20"/><stop offset="1" stop-color="#020304"/></linearGradient>
+    <linearGradient id="screen" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#161a20"/><stop offset="1" stop-color="#030405"/></linearGradient>
+    <linearGradient id="shine"><stop stop-color="#fff" stop-opacity=".72"/><stop offset=".45" stop-color="#fff" stop-opacity=".1"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <radialGradient id="halo"><stop stop-color="#f5c518" stop-opacity=".22"/><stop offset="1" stop-color="#f5c518" stop-opacity="0"/></radialGradient>
+    <filter id="shadow" x="-40%" y="-40%" width="180%" height="210%"><feDropShadow dy="31" stdDeviation="26" flood-color="#000" flood-opacity=".64"/><feDropShadow dy="4" stdDeviation="7" flood-color="#f5c518" flood-opacity=".14"/></filter>
+    <filter id="glow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".72" numOctaves="2" seed="34" result="n"/><feComponentTransfer><feFuncA type="table" tableValues="0 0 .045"/></feComponentTransfer><feBlend in="SourceGraphic" mode="soft-light"/></filter>
+    <clipPath id="terminal"><path d="M292 157h382c42 0 77 30 84 72l68 408c8 47-28 90-76 90H274c-48 0-84-43-76-90l68-408c7-42 42-72 84-72Z"/></clipPath>
+  </defs>
+  <style>
+    .terminal{transform-box:fill-box;transform-origin:center;animation:float 5.7s ease-in-out infinite}.card{transform-box:fill-box;transform-origin:center;animation:tap 4.2s cubic-bezier(.4,0,.2,1) infinite}.shield{transform-box:fill-box;transform-origin:center;animation:shield 3.1s ease-in-out infinite}.scan{animation:scan 6.2s ease-in-out infinite}.led{animation:led 1.9s ease-in-out infinite}
+    @keyframes float{50%{transform:translateY(-10px) rotate(-.25deg)}}@keyframes tap{0%,22%,100%{transform:translate(0,0) rotate(-8deg)}48%,65%{transform:translate(-26px,34px) rotate(-4deg)}}@keyframes shield{50%{transform:scale(1.055);filter:brightness(1.24)}}@keyframes scan{0%,18%,100%{opacity:0;transform:translateX(-260px)}44%,57%{opacity:.55;transform:translateX(380px)}}@keyframes led{50%{opacity:.28}}@media(prefers-reduced-motion:reduce){*{animation:none!important}}
+  </style>
+  <circle cx="512" cy="376" r="330" fill="url(#halo)"/><ellipse cx="503" cy="708" rx="280" ry="37" fill="#000" opacity=".43" filter="url(#shadow)"/>
+  <g class="terminal" filter="url(#shadow)">
+    <path d="M292 157h382c42 0 77 30 84 72l68 408c8 47-28 90-76 90H274c-48 0-84-43-76-90l68-408c7-42 42-72 84-72Z" fill="url(#body)" stroke="url(#gold)" stroke-width="9" filter="url(#grain)"/>
+    <path d="M666 168c39 4 70 32 77 70l66 399c7 40-23 76-64 76h-68c31-24 43-53 36-94l-67-398c-4-24-15-41-34-53Z" fill="url(#side)" opacity=".58"/>
+    <rect x="309" y="214" width="405" height="251" rx="38" fill="url(#screen)" stroke="#fff" stroke-opacity=".12" stroke-width="4"/>
+    <circle cx="512" cy="340" r="91" fill="#f5c518" opacity=".06"/>
+    <g class="shield" filter="url(#glow)"><path d="M512 260c40 28 82 34 82 34v67c0 61-82 102-82 102s-82-41-82-102v-67s42-6 82-34Z" fill="#101216" stroke="url(#gold)" stroke-width="10"/><path d="M471 358l27 27 58-65" fill="none" stroke="#fff8c8" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/></g>
+    <g fill="#0a0c10" stroke="#fff" stroke-opacity=".14" stroke-width="3"><rect x="327" y="506" width="85" height="56" rx="18"/><rect x="428" y="506" width="85" height="56" rx="18"/><rect x="529" y="506" width="85" height="56" rx="18"/><rect x="630" y="506" width="85" height="56" rx="18"/><rect x="347" y="582" width="85" height="56" rx="18"/><rect x="448" y="582" width="85" height="56" rx="18"/><rect x="549" y="582" width="85" height="56" rx="18"/><rect x="650" y="582" width="65" height="56" rx="18"/></g>
+    <g fill="url(#gold)" opacity=".74"><circle cx="370" cy="534" r="7"/><circle cx="470" cy="534" r="7"/><circle cx="571" cy="534" r="7"/><circle cx="672" cy="534" r="7"/></g>
+    <g clip-path="url(#terminal)"><path class="scan" d="M130 128h110l365 640H480Z" fill="url(#shine)"/></g>
+    <circle class="led" cx="512" cy="683" r="8" fill="#f5c518" filter="url(#glow)"/>
+  </g>
+  <g class="card" transform="translate(704 82) rotate(-8)" filter="url(#shadow)"><rect width="244" height="154" rx="27" fill="url(#gold)"/><rect y="42" width="244" height="31" fill="#101217" opacity=".9"/><rect x="25" y="94" width="56" height="37" rx="8" fill="#fff2a7" opacity=".74"/><circle cx="193" cy="112" r="24" fill="#fff" opacity=".24"/><circle cx="166" cy="112" r="24" fill="#fff" opacity=".17"/><path d="M25 20h96" stroke="#fff" stroke-opacity=".48" stroke-width="8" stroke-linecap="round"/></g>
+</svg>

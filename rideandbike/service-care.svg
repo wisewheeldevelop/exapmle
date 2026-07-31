@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 768" role="img" aria-labelledby="title desc">
+  <title id="title">משלוח או איסוף עצמי</title>
+  <desc id="desc">אריזת משלוח תלת־ממדית עם מסלול וסיכת יעד מוזהבת</desc>
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff5ae"/><stop offset=".23" stop-color="#ffe15d"/><stop offset=".62" stop-color="#f5c518"/><stop offset="1" stop-color="#874800"/></linearGradient>
+    <linearGradient id="front" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fbd95a"/><stop offset=".35" stop-color="#e6a70a"/><stop offset="1" stop-color="#753b00"/></linearGradient>
+    <linearGradient id="side" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a65e00"/><stop offset="1" stop-color="#3d1c00"/></linearGradient>
+    <linearGradient id="dark" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#4e5561"/><stop offset=".3" stop-color="#20242b"/><stop offset=".78" stop-color="#07080a"/><stop offset="1" stop-color="#333842"/></linearGradient>
+    <linearGradient id="shine"><stop stop-color="#fff" stop-opacity=".74"/><stop offset=".45" stop-color="#fff" stop-opacity=".1"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <radialGradient id="halo"><stop stop-color="#f5c518" stop-opacity=".2"/><stop offset="1" stop-color="#f5c518" stop-opacity="0"/></radialGradient>
+    <filter id="shadow" x="-40%" y="-40%" width="180%" height="210%"><feDropShadow dy="31" stdDeviation="25" flood-color="#000" flood-opacity=".62"/><feDropShadow dy="4" stdDeviation="7" flood-color="#f5c518" flood-opacity=".14"/></filter>
+    <filter id="blur"><feGaussianBlur stdDeviation="17"/></filter>
+    <filter id="glow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".74" numOctaves="2" seed="48" result="n"/><feComponentTransfer><feFuncA type="table" tableValues="0 0 .05"/></feComponentTransfer><feBlend in="SourceGraphic" mode="multiply"/></filter>
+    <clipPath id="frontClip"><path d="M202 287l376 82v298l-376-82Z"/></clipPath>
+  </defs>
+  <style>
+    .parcel{transform-box:fill-box;transform-origin:center;animation:ride 5.6s cubic-bezier(.4,0,.2,1) infinite}.pin{transform-box:fill-box;transform-origin:bottom;animation:pin 3.6s ease-in-out infinite}.route{animation:dash 1.6s linear infinite}.gleam{animation:gleam 6.2s ease-in-out infinite}.ring{transform-box:fill-box;transform-origin:center;animation:ring 2.8s ease-out infinite}
+    @keyframes ride{50%{transform:translate(10px,-10px) rotate(-.35deg)}}@keyframes pin{50%{transform:translateY(-13px)}}@keyframes dash{to{stroke-dashoffset:-62}}@keyframes gleam{0%,18%,100%{opacity:0;transform:translateX(-270px)}43%,56%{opacity:.52;transform:translateX(410px)}}@keyframes ring{0%{opacity:.7;transform:scale(.55)}80%,100%{opacity:0;transform:scale(1.28)}}@media(prefers-reduced-motion:reduce){*{animation:none!important}}
+  </style>
+  <circle cx="512" cy="370" r="330" fill="url(#halo)"/>
+  <path class="route" d="M78 630C236 675 339 706 488 674s250-121 462-82" fill="none" stroke="url(#gold)" stroke-width="7" stroke-linecap="round" stroke-dasharray="21 41" opacity=".72"/>
+  <ellipse cx="493" cy="691" rx="312" ry="39" fill="#000" opacity=".43" filter="url(#blur)"/>
+  <g class="parcel" filter="url(#shadow)">
+    <path d="M202 287l376 82v298l-376-82Z" fill="url(#front)" filter="url(#grain)"/>
+    <path d="M578 369l207-112v290L578 667Z" fill="url(#side)" filter="url(#grain)"/>
+    <path d="M202 287l200-105 383 75-207 112Z" fill="#f7c82c"/>
+    <path d="M402 182l129-68 382 73-128 70Z" fill="url(#gold)"/>
+    <path d="M202 287l376 82 207-112-383-75Z" fill="none" stroke="#fff4ac" stroke-opacity=".64" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M390 328l153 34v298l-153-34Z" fill="url(#gold)" opacity=".84"/>
+    <g transform="translate(455 454) skewY(12)"><circle r="68" fill="#5c2e00" opacity=".25"/><circle r="49" fill="none" stroke="#fff3a8" stroke-width="8"/><path d="M0-31l10 20 23 4-17 16 4 23L0 41l-20 11 4-23-17-16 23-4Z" fill="#fff3a8"/></g>
+    <g clip-path="url(#frontClip)"><path class="gleam" d="M64 242h114l369 473H405Z" fill="url(#shine)"/></g>
+    <g transform="translate(292 606)"><circle r="57" fill="#050609" stroke="url(#dark)" stroke-width="14"/><circle r="27" fill="url(#gold)"/><circle r="9" fill="#111318"/></g>
+    <g transform="translate(672 606)"><circle r="57" fill="#050609" stroke="url(#dark)" stroke-width="14"/><circle r="27" fill="url(#gold)"/><circle r="9" fill="#111318"/></g>
+  </g>
+  <g class="pin" transform="translate(813 92)" filter="url(#shadow)"><circle class="ring" cy="296" r="88" fill="none" stroke="#f5c518" stroke-width="7"/><path d="M0 0c73 0 132 59 132 132 0 96-132 202-132 202S-132 228-132 132C-132 59-73 0 0 0Z" fill="url(#dark)" stroke="url(#gold)" stroke-width="10"/><circle cy="130" r="50" fill="#080a0d" stroke="url(#gold)" stroke-width="8"/><path d="M-25 131l18 18 37-42" fill="none" stroke="#fff7c7" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/></g>
+</svg>

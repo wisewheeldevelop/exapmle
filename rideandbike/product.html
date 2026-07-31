@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='13' fill='%23f5c518'/></svg>" />
+  <title>פרטי כלי · RIDE AND BIKE</title>
+  <meta name="description" content="פרטי דגם, מחיר, מפרט והזמנה ב-RIDE AND BIKE ראשון לציון.">
+  <meta name="theme-color" content="#08090b">
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800&family=Rubik:wght@700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="store.css"><link rel="stylesheet" href="commerce.css">
+</head>
+<body class="product-page-body">
+<header class="store-nav"><div class="shell nav-inner">
+  <a class="store-brand" href="index.html"><i></i>RIDE AND <b>BIKE</b></a>
+  <ul class="store-links"><li><a href="index.html">בית</a></li><li><a href="electric-bikes.html">אופניים חשמליים</a></li><li><a href="electric-scooters.html">קורקינטים</a></li><li><a href="service.html">איך מזמינים</a></li></ul>
+  <a class="nav-visit" href="service.html">משלוח ואיסוף</a>
+  <details class="mobile-nav"><summary aria-label="פתיחת תפריט"><span></span><span></span></summary><nav><a href="index.html">בית</a><a href="electric-bikes.html">אופניים חשמליים</a><a href="electric-scooters.html">קורקינטים חשמליים</a><a href="service.html">איך מזמינים</a></nav></details>
+</div></header>
+<main class="product-page"><div class="shell">
+  <nav class="breadcrumbs" aria-label="פירורי לחם"><a href="index.html">בית</a><span>←</span><a id="detailBack" href="electric-bikes.html">קטלוג</a><span>←</span><span>פרטי דגם</span></nav>
+  <article class="product-detail">
+    <figure class="detail-visual"><img id="detailImage" src="electricbike.png" alt=""><figcaption class="detail-art-note">המחשת קטגוריה מקורית · לא צילום הדגם</figcaption></figure>
+    <div class="detail-copy"><span class="detail-brand" id="detailBrand"></span><h1 id="detailName"></h1><p class="detail-lead" id="detailLead"></p><div class="detail-badges" id="detailBadges"></div><div class="detail-specs" id="detailSpecs"></div>
+      <div class="detail-purchase"><div class="product-price"><strong id="detailPrice"></strong><del id="detailOldPrice"></del></div><button class="add-cart-btn" id="detailAddCart" type="button">הוספה לסל</button></div>
+      <div class="detail-callout"><h2>למי זה יכול להתאים?</h2><p id="detailFit"></p><ul id="detailHighlights" style="margin:18px 20px 0;color:#d4d4d7;line-height:1.9"></ul></div>
+      <div class="detail-actions"><button class="gold-btn" type="button" data-cart-trigger>לסל ולבחירת מסירה</button><a class="gold-btn" id="detailBackCta" href="electric-bikes.html" style="background:#e4dfd5;box-shadow:none">חזרה לקטלוג</a></div>
+      <p class="source-link">המחיר והמפרט מבוססים על עמוד היבואן ונבדקים שוב לפני חיוב. <a id="detailSource" href="#" target="_blank" rel="noopener">למקור המפרט ↗</a></p>
+    </div>
+  </article>
+</div></main>
+<footer class="site-footer"><div class="shell"><div class="footer-grid"><div><div class="footer-logo">RIDE AND <span>BIKE</span></div><p class="footer-copy">בוחרים, מזמינים ומקבלים במשלוח או באיסוף עצמי.</p></div><div class="footer-col"><h2>קטלוגים</h2><a href="electric-bikes.html">אופניים חשמליים</a><a href="electric-scooters.html">קורקינטים</a></div><div class="footer-col"><h2>הזמנה</h2><a href="checkout.html">מעבר ל־Checkout</a><p>מרכז ראשון לציון</p></div></div><div class="footer-bottom"><span>© <span data-year></span> RIDE AND BIKE</span><span>קנייה אונליין. שירות מקומי.</span></div></div></footer>
+<script src="catalog-data.js"></script><script src="store-ui.js"></script><script src="commerce.js"></script>
+<script>const p=(window.RIDE_CATALOG||[]).find(x=>x.id===new URLSearchParams(location.search).get('id'));if(p){document.getElementById('detailBackCta').href=p.type==='bike'?'electric-bikes.html':'electric-scooters.html'}</script>
+</body></html>

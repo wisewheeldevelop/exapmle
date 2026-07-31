@@ -1,0 +1,1600 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<link rel="icon" href="data:," />
+<title>RIDE AND BIKE — Coastal Storm Road</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:100%;height:100%;overflow:hidden;background:#020407}
+  canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+</style>
+</head>
+<body>
+<canvas id="road"></canvas>
+<script type="importmap">
+{
+  "imports":{
+    "three":"https://cdn.jsdelivr.net/npm/three@0.181.2/build/three.module.js",
+    "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.181.2/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
+import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
+import {ShaderPass} from 'three/addons/postprocessing/ShaderPass.js';
+import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
+import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
+import {
+  ROAD_WIDTH as SHARED_ROAD_WIDTH,
+  createRoadCurve,
+  applyHeroCamera,
+  isHeroMobile
+} from './road-path.js';
+
+const canvas=document.getElementById('road');
+const webgl2=canvas.getContext('webgl2',{
+  alpha:false,antialias:true,powerPreference:'high-performance'
+});
+const renderer=new THREE.WebGLRenderer({
+  canvas,context:webgl2||undefined,alpha:false,antialias:true,
+  powerPreference:'high-performance'
+});
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.28;
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.setClearColor(0x020407,1);
+
+const scene=new THREE.Scene();
+scene.fog=new THREE.FogExp2(0x071018,.0072);
+const camera=new THREE.PerspectiveCamera(52,1,.1,340);
+camera.position.set(.15,2.22,11.4);
+
+const query=new URLSearchParams(location.search);
+const fixedTime=Number.parseFloat(query.get('time'));
+const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const isMobile=()=>isHeroMobile(innerWidth,innerHeight);
+const quality=innerWidth<700?'mobile':'desktop';
+const DPR_CAP=quality==='mobile'?1.2:1.55;
+
+let seed=0x4a3b2c1d;
+const random=()=>{
+  seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;
+  return (seed>>>0)/4294967296;
+};
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const lerp=(a,b,t)=>a+(b-a)*t;
+
+function canvasTexture(width,height,draw,color=true){
+  const source=document.createElement('canvas');
+  source.width=width;source.height=height;
+  draw(source.getContext('2d'),width,height);
+  const texture=new THREE.CanvasTexture(source);
+  texture.wrapS=texture.wrapT=THREE.RepeatWrapping;
+  texture.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
+  if(color) texture.colorSpace=THREE.SRGBColorSpace;
+  texture.needsUpdate=true;
+  return texture;
+}
+
+function valueNoise(x,y){
+  const hash=(ix,iy)=>{
+    const n=Math.sin(ix*127.1+iy*311.7)*43758.5453123;
+    return n-Math.floor(n);
+  };
+  const ix=Math.floor(x),iy=Math.floor(y),fx=x-ix,fy=y-iy;
+  const sx=fx*fx*(3-2*fx),sy=fy*fy*(3-2*fy);
+  return lerp(lerp(hash(ix,iy),hash(ix+1,iy),sx),
+              lerp(hash(ix,iy+1),hash(ix+1,iy+1),sx),sy);
+}
+
+function buildRoadTextures(){
+  const w=quality==='mobile'?256:512;
+  const h=w*2;
+  const count=w*h;
+  const heightField=new Float32Array(count);
+  const wetField=new Float32Array(count);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const nx=x/w,ny=y/h;
+    const coarse=valueNoise(nx*13,ny*31);
+    const aggregate=valueNoise(nx*73,ny*151);
+    const fine=valueNoise(nx*241,ny*389);
+    heightField[y*w+x]=coarse*.48+aggregate*.34+fine*.18;
+    const puddle=valueNoise(nx*5.2+8,ny*12.5-3);
+    const streak=valueNoise(nx*18,ny*4.8);
+    wetField[y*w+x]=clamp((puddle-.48)*2.5+(streak-.5)*.38,0,1);
+  }
+
+  const baseCanvas=document.createElement('canvas');
+  baseCanvas.width=w;baseCanvas.height=h;
+  const baseCtx=baseCanvas.getContext('2d');
+  const baseImage=baseCtx.createImageData(w,h);
+  const roughCanvas=document.createElement('canvas');
+  roughCanvas.width=w;roughCanvas.height=h;
+  const roughCtx=roughCanvas.getContext('2d');
+  const roughImage=roughCtx.createImageData(w,h);
+  const normalCanvas=document.createElement('canvas');
+  normalCanvas.width=w;normalCanvas.height=h;
+  const normalCtx=normalCanvas.getContext('2d');
+  const normalImage=normalCtx.createImageData(w,h);
+  const aoCanvas=document.createElement('canvas');
+  aoCanvas.width=w;aoCanvas.height=h;
+  const aoCtx=aoCanvas.getContext('2d');
+  const aoImage=aoCtx.createImageData(w,h);
+
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const i=y*w+x,p=i*4;
+    const v=heightField[i],wet=wetField[i];
+    const gravel=(valueNoise(x*.67,y*.71)>.84)?10:0;
+    const base=clamp(40+v*43+gravel-wet*11,24,92);
+    baseImage.data[p]=base*.86;
+    baseImage.data[p+1]=base*.92;
+    baseImage.data[p+2]=base;
+    baseImage.data[p+3]=255;
+    const rough=clamp(205-v*48-wet*95,55,220);
+    roughImage.data[p]=roughImage.data[p+1]=roughImage.data[p+2]=rough;
+    roughImage.data[p+3]=255;
+    const xl=heightField[y*w+Math.max(0,x-1)];
+    const xr=heightField[y*w+Math.min(w-1,x+1)];
+    const yd=heightField[Math.max(0,y-1)*w+x];
+    const yu=heightField[Math.min(h-1,y+1)*w+x];
+    const nx=clamp((xl-xr)*2.3,-1,1),ny=clamp((yd-yu)*2.3,-1,1);
+    const nz=Math.sqrt(Math.max(.001,1-nx*nx*.3-ny*ny*.3));
+    normalImage.data[p]=(nx*.5+.5)*255;
+    normalImage.data[p+1]=(ny*.5+.5)*255;
+    normalImage.data[p+2]=nz*255;
+    normalImage.data[p+3]=255;
+    const ao=clamp(150+v*105-wet*18,80,255);
+    aoImage.data[p]=aoImage.data[p+1]=aoImage.data[p+2]=ao;
+    aoImage.data[p+3]=255;
+  }
+  baseCtx.putImageData(baseImage,0,0);
+  roughCtx.putImageData(roughImage,0,0);
+  normalCtx.putImageData(normalImage,0,0);
+  aoCtx.putImageData(aoImage,0,0);
+
+  // Long, non-repeating repair seams and small branching cracks.
+  baseCtx.strokeStyle='rgba(2,3,4,.72)';
+  baseCtx.lineCap='round';
+  for(let c=0;c<28;c++){
+    let x=random()*w,y=random()*h;
+    baseCtx.beginPath();baseCtx.moveTo(x,y);
+    const pieces=3+Math.floor(random()*7);
+    for(let j=0;j<pieces;j++){
+      x+=(-.5+random())*22;
+      y+=9+random()*42;
+      baseCtx.lineTo(x,y);
+    }
+    baseCtx.lineWidth=.6+random()*1.9;baseCtx.stroke();
+    if(random()>.58){
+      baseCtx.beginPath();baseCtx.moveTo(x,y);
+      baseCtx.lineTo(x+(-.5+random())*38,y+12+random()*30);
+      baseCtx.lineWidth=.45;baseCtx.stroke();
+    }
+  }
+  for(let i=0;i<220;i++){
+    const x=random()*w,y=random()*h,r=.35+random()*1.25;
+    baseCtx.fillStyle=`rgba(${45+random()*28},${45+random()*26},${43+random()*22},${.16+random()*.32})`;
+    baseCtx.beginPath();baseCtx.arc(x,y,r,0,Math.PI*2);baseCtx.fill();
+  }
+
+  const makeTexture=(source,color=false)=>{
+    const texture=new THREE.CanvasTexture(source);
+    texture.wrapS=texture.wrapT=THREE.RepeatWrapping;
+    texture.repeat.set(1.65,18);
+    texture.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
+    if(color) texture.colorSpace=THREE.SRGBColorSpace;
+    return texture;
+  };
+  return {
+    map:makeTexture(baseCanvas,true),
+    roughnessMap:makeTexture(roughCanvas),
+    normalMap:makeTexture(normalCanvas),
+    aoMap:makeTexture(aoCanvas)
+  };
+}
+
+function makeEnvironment(){
+  const env=canvasTexture(1024,512,(ctx,w,h)=>{
+    const sky=ctx.createLinearGradient(0,0,0,h);
+    sky.addColorStop(0,'#010307');
+    sky.addColorStop(.48,'#09131d');
+    sky.addColorStop(.7,'#16212a');
+    sky.addColorStop(.76,'#5c431e');
+    sky.addColorStop(1,'#030506');
+    ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);
+    for(let i=0;i<90;i++){
+      const x=random()*w,y=random()*h*.62;
+      const r=30+random()*110;
+      const g=ctx.createRadialGradient(x,y,0,x,y,r);
+      g.addColorStop(0,`rgba(54,68,82,${.06+random()*.14})`);
+      g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g;ctx.fillRect(x-r,y-r,r*2,r*2);
+    }
+    ctx.fillStyle='rgba(239,164,52,.5)';
+    for(let i=0;i<55;i++)ctx.fillRect(random()*w,h*.70+random()*14,1+random()*2,1);
+  });
+  env.mapping=THREE.EquirectangularReflectionMapping;
+  scene.environment=env;
+  scene.environmentIntensity=.72;
+}
+makeEnvironment();
+
+// Spline and width come from road-path.js so the product scene can put its
+// wheels on this exact surface. Do not inline the control points here again.
+const roadCurve=createRoadCurve(THREE);
+const ROAD_WIDTH=SHARED_ROAD_WIDTH;
+const roadSegments=quality==='mobile'?170:260;
+
+function roadFrame(t){
+  const center=roadCurve.getPointAt(clamp(t,0,1));
+  const tangent=roadCurve.getTangentAt(clamp(t,0,1)).normalize();
+  const right=new THREE.Vector3(-tangent.z,0,tangent.x).normalize();
+  return {center,tangent,right};
+}
+
+function ribbonGeometry(curve,width,segments,crossSegments=1,yOffset=0,bank=true){
+  const positions=[],uvs=[],indices=[];
+  for(let i=0;i<=segments;i++){
+    const t=i/segments;
+    const {center,tangent,right}=roadFrame(t);
+    const bend=bank?clamp(-tangent.x*.06,-.035,.035):0;
+    for(let j=0;j<=crossSegments;j++){
+      const f=j/crossSegments;
+      const lateral=(f-.5)*width;
+      const crown=bank?Math.max(0,1-Math.abs((f-.5)*2))*.075:0;
+      positions.push(
+        center.x+right.x*lateral,
+        center.y+yOffset+crown+bend*lateral,
+        center.z+right.z*lateral
+      );
+      uvs.push(f,t);
+    }
+  }
+  for(let i=0;i<segments;i++)for(let j=0;j<crossSegments;j++){
+    const row=crossSegments+1;
+    const a=i*row+j,b=a+1,c=(i+1)*row+j,d=c+1;
+    // Counter-clockwise from the camera/sky side. The previous winding made
+    // every road normal face underground, breaking all physically based light.
+    indices.push(a,b,c,b,d,c);
+  }
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));
+  geometry.setAttribute('uv1',new THREE.Float32BufferAttribute(uvs,2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+const roadTextures=buildRoadTextures();
+const roadMaterial=new THREE.MeshPhysicalMaterial({
+  color:0xc5c7c8,
+  map:roadTextures.map,
+  roughness:.68,
+  roughnessMap:roadTextures.roughnessMap,
+  metalness:.045,
+  normalMap:roadTextures.normalMap,
+  normalScale:new THREE.Vector2(.62,.62),
+  aoMap:roadTextures.aoMap,
+  aoMapIntensity:.72,
+  clearcoat:.18,
+  clearcoatRoughness:.43,
+  envMapIntensity:1.12,
+  emissive:0x18242c,
+  emissiveMap:roadTextures.map,
+  emissiveIntensity:.58
+});
+const road=new THREE.Mesh(ribbonGeometry(roadCurve,ROAD_WIDTH,roadSegments,18,0,true),roadMaterial);
+road.receiveShadow=true;
+scene.add(road);
+
+// Fine, non-repeating surface damage is real geometry. It stays crisp close to
+// camera while the PBR maps carry the micro aggregate into the distance.
+const crackPositions=[];
+for(let crack=0;crack<(quality==='mobile'?34:68);crack++){
+  let t=.008+random()*.58;
+  let lateral=(random()-.5)*(ROAD_WIDTH-1.6);
+  const pieces=2+Math.floor(random()*5);
+  for(let piece=0;piece<pieces;piece++){
+    const a=roadFrame(t);
+    const p1=a.center.clone().addScaledVector(a.right,lateral);
+    t+=.0015+random()*.0055;
+    lateral+=(random()-.5)*.34;
+    const b=roadFrame(t);
+    const p2=b.center.clone().addScaledVector(b.right,lateral);
+    crackPositions.push(p1.x,p1.y+.108,p1.z,p2.x,p2.y+.108,p2.z);
+  }
+}
+const crackGeometry=new THREE.BufferGeometry();
+crackGeometry.setAttribute('position',new THREE.Float32BufferAttribute(crackPositions,3));
+const cracks=new THREE.LineSegments(crackGeometry,new THREE.LineBasicMaterial({
+  color:0x05080a,transparent:true,opacity:.76,depthWrite:false
+}));
+scene.add(cracks);
+
+const shoulderMaterial=new THREE.MeshStandardMaterial({
+  color:0x101216,roughness:.96,metalness:.03,envMapIntensity:.22
+});
+const shoulderLeft=new THREE.Mesh(ribbonGeometry(roadCurve,2.6,roadSegments,3,-.08,false),shoulderMaterial);
+const shoulderRight=shoulderLeft.clone();
+function shiftRibbon(mesh,offset){
+  const pos=mesh.geometry.attributes.position;
+  for(let i=0;i<pos.count;i++){
+    const t=Math.floor(i/4)/(roadSegments);
+    const frame=roadFrame(t);
+    pos.setXYZ(i,pos.getX(i)+frame.right.x*offset,pos.getY(i),pos.getZ(i)+frame.right.z*offset);
+  }
+  pos.needsUpdate=true;mesh.geometry.computeVertexNormals();
+}
+shoulderLeft.geometry=shoulderLeft.geometry.clone();
+shoulderRight.geometry=shoulderRight.geometry.clone();
+shiftRibbon(shoulderLeft,-(ROAD_WIDTH*.5+1.3));
+shiftRibbon(shoulderRight,ROAD_WIDTH*.5+1.3);
+scene.add(shoulderLeft,shoulderRight);
+
+function markingTexture(){
+  return canvasTexture(64,1024,(ctx,w,h)=>{
+    ctx.clearRect(0,0,w,h);
+    ctx.fillStyle='#e8b329';ctx.fillRect(8,0,w-16,h);
+    ctx.globalCompositeOperation='destination-out';
+    for(let i=0;i<64;i++){
+      const y=random()*h,x=5+random()*(w-10);
+      ctx.globalAlpha=.32+random()*.55;
+      ctx.fillRect(x,y,1+random()*8,1+random()*4);
+    }
+    ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
+  });
+}
+const wornAlpha=markingTexture();
+wornAlpha.repeat.set(1,7);
+function addMarking(offset,width,color){
+  const mat=new THREE.MeshStandardMaterial({
+    color,roughness:.46,metalness:.025,envMapIntensity:.72,
+    transparent:true,alphaMap:wornAlpha,alphaTest:.08,
+    emissive:new THREE.Color(color),emissiveIntensity:.12
+  });
+  mat.polygonOffset=true;
+  mat.polygonOffsetFactor=-2;
+  mat.polygonOffsetUnits=-2;
+  const mesh=new THREE.Mesh(ribbonGeometry(roadCurve,width,roadSegments,1,.14,false),mat);
+  const pos=mesh.geometry.attributes.position;
+  for(let i=0;i<pos.count;i++){
+    const t=Math.floor(i/2)/roadSegments;
+    const f=roadFrame(t);
+    pos.setXYZ(i,pos.getX(i)+f.right.x*offset,pos.getY(i),pos.getZ(i)+f.right.z*offset);
+  }
+  pos.needsUpdate=true;
+  mesh.receiveShadow=true;
+  scene.add(mesh);
+  return mesh;
+}
+addMarking(-.16,.115,0xd8a41f);
+addMarking(.16,.115,0xd8a41f);
+addMarking(-ROAD_WIDTH*.5+.48,.09,0xbab9b1);
+addMarking(ROAD_WIDTH*.5-.48,.09,0xbab9b1);
+
+// Puddles are no longer geometry: the wet-asphalt shader below owns the
+// water film, its pooling and its ripples, which keeps them consistent with
+// the reflections they break up.
+
+/* ═══════════════════════════════════════════════════════════════════
+   THE RIVER
+   A normal-mapped plane cannot read as moving water: the silhouette never
+   changes, the horizon stays a ruler line, and every wave is a lighting
+   trick on a surface that is objectively flat. So this is real geometry.
+
+   Four Gerstner waves displace the mesh — crucially in X and Z as well as
+   in Y, which is what piles water up into sharp crests and stretches the
+   troughs flat, the single strongest cue that a surface is liquid and in
+   motion. The normal is derived analytically from the same sum, so shading,
+   foam and reflections all agree with the geometry rather than approximating
+   it. Everything drifts on one current direction: this is a river, and a
+   river goes somewhere.
+   ═══════════════════════════════════════════════════════════════════ */
+const waterSegments=quality==='mobile'?[110,150]:[180,240];
+const waterGeo=new THREE.PlaneGeometry(150,240,waterSegments[0],waterSegments[1]);
+const waterMat=new THREE.MeshPhysicalMaterial({
+  color:0x061019,roughness:.16,metalness:.20,clearcoat:1,
+  clearcoatRoughness:.10,envMapIntensity:1.55,
+  transparent:true,opacity:.97
+});
+const waterUniforms={
+  uSeaTime:{value:0},
+  uSeaFlash:{value:0},
+  uSeaBolt:{value:new THREE.Vector3(-14,20,-86)},
+  uSeaCam:{value:new THREE.Vector3()}
+};
+
+/* One wave definition shared by the vertex and fragment stages. Duplicating
+   it would let the shading drift away from the geometry it is meant to be
+   describing, which is exactly how water starts looking like plastic. */
+const GERSTNER=/* glsl */`
+  uniform float uSeaTime,uSeaFlash;
+  uniform vec3 uSeaBolt,uSeaCam;
+
+  /* direction.xy, wavelength (m), amplitude (m).
+     Amplitude is not steepness: Gerstner's Q only controls how far the
+     horizontal pinch goes, and feeding it in as the height turns a river
+     into six-metre alps. These are river numbers — the tallest swell is
+     twenty-two centimetres. */
+  const vec4 W0=vec4( 0.86, 0.51, 26.0, 0.210);
+  const vec4 W1=vec4( 0.62,-0.78, 14.5, 0.135);
+  const vec4 W2=vec4( 0.95, 0.31,  6.8, 0.068);
+  const vec4 W3=vec4( 0.40, 0.92,  3.3, 0.034);
+  const vec4 SPD=vec4(1.00, 0.88, 1.30, 1.70);
+  const float STEEPNESS=0.62;   // horizontal pinch: crests sharp, troughs flat
+
+  /* Accumulates the displacement and, at the same time, the partial
+     derivatives the normal needs. Returns the offset; writes the tangent
+     frame through the out parameters. */
+  vec3 gerstner(vec2 p,float t,out vec3 tangent,out vec3 binormal){
+    vec3 offset=vec3(0.0);
+    tangent=vec3(1.0,0.0,0.0);
+    binormal=vec3(0.0,0.0,1.0);
+    for(int i=0;i<4;i++){
+      vec4 w = i==0?W0:(i==1?W1:(i==2?W2:W3));
+      vec2 dir=normalize(w.xy);
+      float wavelength=w.z;
+      float a=w.w;
+      float k=6.28318530718/wavelength;
+      float c=sqrt(9.81/k);                 // deep-water phase speed
+      float f=k*(dot(dir,p)-c*t*SPD[i]);
+      float sinf=sin(f), cosf=cos(f);
+      float q=STEEPNESS*a;
+      offset.x+=dir.x*q*cosf;
+      offset.z+=dir.y*q*cosf;
+      offset.y+=a*sinf;
+      float wa=k*a;
+      float wq=k*q;
+      tangent  += vec3(-dir.x*dir.x*wq*sinf, dir.x*wa*cosf, -dir.x*dir.y*wq*sinf);
+      binormal += vec3(-dir.x*dir.y*wq*sinf, dir.y*wa*cosf, -dir.y*dir.y*wq*sinf);
+    }
+    return offset;
+  }
+`;
+
+waterMat.onBeforeCompile=shader=>{
+  Object.assign(shader.uniforms,waterUniforms);
+  shader.vertexShader=shader.vertexShader
+    .replace('#include <common>','#include <common>\n'+GERSTNER+
+      '\nvarying vec3 vSeaWorld;varying vec3 vSeaNormal;varying float vSeaCrest;')
+    .replace('#include <begin_vertex>',`#include <begin_vertex>
+      {
+        /* The plane is authored flat and rotated into place, so its local XY
+           is the world XZ the waves live in. Displace here, before three
+           builds the model-view position from it. */
+        vec2 surface=(modelMatrix*vec4(transformed,1.0)).xz;
+        vec3 tangent,binormal;
+        vec3 wave=gerstner(surface,uSeaTime,tangent,binormal);
+        // Taper the far field: 34 m swells rendered at 200 m alias badly and
+        // buy nothing, because none of it subtends a pixel out there.
+        float reach=1.0-smoothstep(60.0,190.0,distance(uSeaCam,(modelMatrix*vec4(transformed,1.0)).xyz));
+        float fade=mix(0.18,1.0,reach);
+        transformed.x+=wave.x*fade;
+        transformed.y+=wave.z*fade;   // plane local Y maps to world Z
+        transformed.z+=wave.y*fade;   // plane local Z maps to world up
+        vSeaNormal=normalize(cross(binormal,tangent));
+        vSeaCrest=clamp(wave.y*fade*0.9+0.5,0.0,1.0);
+      }`)
+    .replace('#include <project_vertex>',
+      '#include <project_vertex>\nvSeaWorld=(modelMatrix*vec4(transformed,1.0)).xyz;');
+
+  shader.fragmentShader=shader.fragmentShader
+    .replace('#include <common>','#include <common>\n'+GERSTNER+`
+      varying vec3 vSeaWorld;varying vec3 vSeaNormal;varying float vSeaCrest;
+      float seaHash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+      float seaNoise(vec2 p){
+        vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
+        return mix(mix(seaHash(i),seaHash(i+vec2(1,0)),f.x),
+                   mix(seaHash(i+vec2(0,1)),seaHash(i+vec2(1,1)),f.x),f.y);
+      }`)
+    /* The wave normal has to replace the geometric one before lighting, or
+       the mesh is shaped like water and lit like a sheet of glass. */
+    .replace('#include <normal_fragment_begin>',`#include <normal_fragment_begin>
+      {
+        vec2 chopUv=vSeaWorld.xz*0.62-vec2(uSeaTime*0.55,uSeaTime*0.22);
+        vec2 chop=vec2(
+          seaNoise(chopUv+vec2(0.07,0.0))-seaNoise(chopUv-vec2(0.07,0.0)),
+          seaNoise(chopUv+vec2(0.0,0.07))-seaNoise(chopUv-vec2(0.0,0.07))
+        );
+        float near=1.0-smoothstep(20.0,150.0,distance(uSeaCam,vSeaWorld));
+        normal=normalize(vSeaNormal+vec3(-chop.x,0.0,-chop.y)*1.15*near);
+      }`)
+    .replace('#include <dithering_fragment>',`#include <dithering_fragment>
+      {
+        vec3 P=vSeaWorld;
+        vec3 V=normalize(uSeaCam-P);
+        vec3 N=normal;
+        vec3 R=reflect(-V,N);
+        vec3 lateral=normalize(cross(vec3(0.0,1.0,0.0),V)+1e-5);
+        float t=uSeaTime;
+
+        /* Anything bright across the water throws a column toward the viewer:
+           narrow across the surface, long along it. Same anisotropic lobe the
+           asphalt uses, so both surfaces agree about how wet night looks. */
+        /* Fresnel. At a grazing angle water is a mirror, straight down it is
+           a dark window into depth — this single term does more for realism
+           than any amount of extra wave detail, because it is what makes a
+           surface read as water rather than as blue plastic. */
+        float fres=pow(1.0-clamp(dot(V,N),0.0,1.0),5.0);
+        fres=mix(0.020,1.0,fres);
+        vec3 skyTint=mix(vec3(0.014,0.024,0.038),vec3(0.060,0.082,0.112),
+                         clamp(R.y*1.6,0.0,1.0))
+                     *mix(0.35,1.0,exp(-length(uSeaCam-P)*0.010));
+        vec3 depthTint=vec3(0.006,0.014,0.020);
+        gl_FragColor.rgb=mix(depthTint,gl_FragColor.rgb+skyTint,fres);
+
+        vec3 sea=vec3(0.0);
+        for(int i=0;i<3;i++){
+          vec3 src = i==0 ? uSeaBolt
+                   : (i==1 ? vec3(-26.0,3.2,-110.0)   // city front
+                           : vec3(-34.0,0.7,-104.0)); // shoreline lamps
+          vec3 tint = i==0 ? vec3(1.00,0.80,0.42)
+                   : (i==1 ? vec3(1.00,0.62,0.24)
+                           : vec3(1.00,0.52,0.16));
+          float gain = i==0 ? uSeaFlash*2.10 : (i==1 ? 0.34 : 0.22);
+          vec3 d=src-P;
+          float dist=length(d);
+          vec3 D=d/max(dist,0.001);
+          vec3 diff=R-D;
+          float across=dot(diff,lateral);
+          float along=length(diff-lateral*across);
+          float lobe=exp(-(across*across*40.0+along*along*0.5));
+          sea+=tint*lobe*gain/(1.0+dist*dist*0.0016);
+        }
+
+        /* Foam. Real water only whitens where the surface is steep enough to
+           break, so the mask comes from the wave slope — which means the foam
+           travels with the crests instead of sitting on the surface. */
+        /* Crest scatter: light bleeding through the thin, lifted water at
+           the top of a wave. It is the warm rim on every real swell and it
+           costs one term. */
+        float lift=clamp(vSeaCrest*2.0-1.0,0.0,1.0);
+        sea+=vec3(0.10,0.20,0.26)*pow(lift,2.2)*(0.35+0.65*fres)*0.55;
+
+        float slope=1.0-clamp(N.y,0.0,1.0);
+        float breaking=smoothstep(0.010,0.055,slope);
+        float lace=seaNoise(P.xz*2.4-vec2(t*0.9,t*0.35))*0.6
+                  +seaNoise(P.xz*6.1+vec2(t*0.5,-t*0.8))*0.4;
+        float foam=breaking*smoothstep(0.32,0.86,lace);
+        sea+=vec3(0.52,0.63,0.74)*foam*0.30;
+        sea+=vec3(1.00,0.80,0.45)*foam*uSeaFlash*0.55;
+
+        /* Glitter: sparse facets catching the sky. This is what the eye uses
+           to read motion on dark water when there is no strong light. */
+        float micro=seaNoise(P.xz*5.0+vec2(t*1.05,t*0.42));
+        float micro2=seaNoise(P.xz*11.5-vec2(t*0.62,t*0.95));
+        float facet=smoothstep(0.70,0.99,micro*0.62+micro2*0.48);
+        sea+=vec3(0.55,0.68,0.86)*facet*pow(max(R.y,0.0),1.5)*0.32;
+        sea+=vec3(1.00,0.78,0.40)*facet*uSeaFlash*0.5;
+
+        /* Current lines: long streaks stretched along the flow. Without them
+           a wave field reads as chop in place rather than as water going
+           somewhere, which is the whole difference between sea and river. */
+        float flow=seaNoise(vec2(dot(P.xz,vec2(0.86,0.51))*0.10,
+                                 dot(P.xz,vec2(-0.51,0.86))*0.9)
+                            -vec2(t*0.28,0.0));
+        sea+=vec3(0.30,0.42,0.58)*smoothstep(0.58,0.95,flow)*0.10;
+
+        gl_FragColor.rgb+=sea*mix(0.35,1.0,fres);
+      }`);
+};
+waterMat.customProgramCacheKey=()=>'ride-sea';
+const water=new THREE.Mesh(waterGeo,waterMat);
+water.rotation.x=-Math.PI/2;
+water.position.set(-66,-.72,-70);
+scene.add(water);
+
+const moonFill=new THREE.HemisphereLight(0x536f88,0x171008,1.18);
+scene.add(moonFill);
+const coolKey=new THREE.DirectionalLight(0x91aac1,1.05);
+coolKey.position.set(-18,30,8);
+coolKey.castShadow=true;
+coolKey.shadow.mapSize.set(1024,1024);
+coolKey.shadow.camera.left=-34;coolKey.shadow.camera.right=34;
+coolKey.shadow.camera.top=28;coolKey.shadow.camera.bottom=-16;
+coolKey.shadow.camera.near=1;coolKey.shadow.camera.far=120;
+scene.add(coolKey);
+
+// Broad moon bounce makes the asphalt readable without flattening the night.
+// It follows the camera axis, so the wet micro-normal remains visible in the
+// long grazing highlights instead of collapsing into a black silhouette.
+const roadFill=new THREE.SpotLight(0x7898b5,92,105,.70,.88,1.15);
+roadFill.position.set(-10,16,13);
+roadFill.target.position.set(4,0,-42);
+scene.add(roadFill,roadFill.target);
+const warmBounce=new THREE.SpotLight(0xe1952d,76,94,.78,1,1.18);
+warmBounce.position.set(12,9,-3);
+warmBounce.target.position.set(5,0,-38);
+scene.add(warmBounce,warmBounce.target);
+// A second, narrower warm rake carries the lamp colour through the inner
+// lane.  It stays subtle in the calm state, but gives the wet micro-normal
+// enough energy to break the reflection into long, irregular highlights.
+const warmLaneRake=new THREE.SpotLight(0xffb13b,38,86,.47,.94,1.38);
+warmLaneRake.position.set(-8.5,7.5,-8);
+warmLaneRake.target.position.set(-1.5,.1,-48);
+scene.add(warmLaneRake,warmLaneRake.target);
+
+const railMetal=new THREE.MeshPhysicalMaterial({
+  color:0x454b50,roughness:.27,metalness:.92,clearcoat:.5,
+  clearcoatRoughness:.16,envMapIntensity:1.7
+});
+const darkMetal=new THREE.MeshStandardMaterial({color:0x15191c,roughness:.58,metalness:.82});
+const railReflectorMat=new THREE.MeshStandardMaterial({
+  color:0xffcb45,emissive:0xff950e,emissiveIntensity:4.8,
+  roughness:.24,metalness:.15
+});
+function offsetCurve(offset,height){
+  const points=[];
+  for(let i=0;i<=90;i++){
+    const t=i/90,f=roadFrame(t);
+    points.push(f.center.clone().addScaledVector(f.right,offset).add(new THREE.Vector3(0,height,0)));
+  }
+  return new THREE.CatmullRomCurve3(points);
+}
+function buildGuardrail(offset){
+  const upper=new THREE.Mesh(new THREE.TubeGeometry(offsetCurve(offset,1.0),180,.075,6,false),railMetal);
+  const lower=new THREE.Mesh(new THREE.TubeGeometry(offsetCurve(offset,.68),180,.055,6,false),railMetal);
+  upper.castShadow=lower.castShadow=true;
+  scene.add(upper,lower);
+  const postGeo=new THREE.CylinderGeometry(.055,.07,1.08,6);
+  for(let i=0;i<32;i++){
+    const t=.015+i/35*.93,f=roadFrame(t);
+    const p=f.center.clone().addScaledVector(f.right,offset);
+    const post=new THREE.Mesh(postGeo,darkMetal);
+    post.position.set(p.x,p.y+.48,p.z);
+    post.castShadow=true;scene.add(post);
+    if(i%2===0){
+      const reflector=new THREE.Mesh(
+        new THREE.BoxGeometry(.12,.075,.035),
+        railReflectorMat
+      );
+      reflector.position.set(
+        p.x-f.right.x*.035,
+        p.y+.78,
+        p.z-f.right.z*.035
+      );
+      reflector.rotation.y=Math.atan2(f.tangent.x,f.tangent.z);
+      scene.add(reflector);
+    }
+  }
+}
+buildGuardrail(-ROAD_WIDTH*.5-.28);
+buildGuardrail(ROAD_WIDTH*.5+.28);
+
+function glowTexture(){
+  return canvasTexture(96,256,(ctx,w,h)=>{
+    const g=ctx.createLinearGradient(0,0,0,h);
+    g.addColorStop(0,'rgba(255,206,92,0)');
+    g.addColorStop(.25,'rgba(255,183,48,.68)');
+    g.addColorStop(.65,'rgba(255,146,18,.20)');
+    g.addColorStop(1,'rgba(255,123,0,0)');
+    ctx.fillStyle=g;ctx.fillRect(0,0,w,h);
+    for(let i=0;i<45;i++){
+      ctx.globalCompositeOperation='destination-out';
+      ctx.globalAlpha=.25+random()*.7;
+      ctx.fillRect(random()*w,random()*h,3+random()*30,1+random()*6);
+    }
+  });
+}
+const lampHaloMaterial=new THREE.SpriteMaterial({
+  map:canvasTexture(128,128,(ctx,w,h)=>{
+    const g=ctx.createRadialGradient(w/2,h/2,0,w/2,h/2,w/2);
+    g.addColorStop(0.00,'rgba(255,236,178,0.95)');
+    g.addColorStop(0.16,'rgba(255,190,86,0.44)');
+    g.addColorStop(0.44,'rgba(255,150,32,0.11)');
+    g.addColorStop(1.00,'rgba(255,140,20,0)');
+    ctx.fillStyle=g;ctx.fillRect(0,0,w,h);
+  }),
+  color:0xffb03a,transparent:true,opacity:.3,
+  blending:THREE.AdditiveBlending,depthWrite:false,fog:false
+});
+const poleMat=new THREE.MeshStandardMaterial({color:0x20262a,roughness:.38,metalness:.88});
+const lampMat=new THREE.MeshStandardMaterial({
+  color:0xffd478,emissive:0xffa51d,emissiveIntensity:8.5,
+  roughness:.18,metalness:.05
+});
+const lampTimes=[.055,.115,.19,.275,.37,.47,.58,.69,.80,.9];
+const lamps=[];
+// Every bulb's world position feeds the wet-road shader below, which draws
+// the elongated reflections analytically instead of scattering hundreds of
+// hand-placed billboards down the asphalt.
+const REFLECTOR_LIMIT=10;
+const reflectorPositions=Array.from({length:REFLECTOR_LIMIT},()=>new THREE.Vector3());
+const reflectorPower=new Float32Array(REFLECTOR_LIMIT);
+let reflectorCount=0;
+lampTimes.forEach((t,index)=>{
+  const f=roadFrame(t);
+  const side=ROAD_WIDTH*.5+1.65;
+  const p=f.center.clone().addScaledVector(f.right,side);
+  const height=5.5;
+  const pole=new THREE.Mesh(new THREE.CylinderGeometry(.055,.09,height,8),poleMat);
+  pole.position.set(p.x,p.y+height*.5,p.z);pole.castShadow=true;
+  const arm=new THREE.Mesh(new THREE.CylinderGeometry(.04,.04,1.15,7),poleMat);
+  arm.rotation.z=Math.PI/2;
+  arm.position.set(p.x-f.right.x*.52,p.y+height,p.z-f.right.z*.52);
+  const bulb=new THREE.Mesh(new THREE.SphereGeometry(.13,12,8),lampMat);
+  bulb.position.set(p.x-f.right.x*1.05,p.y+height,p.z-f.right.z*1.05);
+  scene.add(pole,arm,bulb);
+  // Wet air scatters sodium light into a soft orb around every lamp.
+  const halo=new THREE.Sprite(lampHaloMaterial.clone());
+  halo.position.copy(bulb.position);
+  const haloSize=index<4?2.5:1.9;
+  halo.scale.set(haloSize,haloSize,1);
+  halo.material.opacity=index<4?.34:.24;
+  scene.add(halo);
+  if(index<6){
+    const intensity=index===0?28:(index<4?54:38);
+    const light=new THREE.PointLight(0xffa62a,intensity,index<3?23:19,1.72);
+    light.position.copy(bulb.position);
+    if(index<2){light.castShadow=true;light.shadow.mapSize.set(512,512);}
+    scene.add(light);lamps.push({light,bulb,t,baseIntensity:light.intensity});
+  }
+  if(reflectorCount<REFLECTOR_LIMIT){
+    reflectorPositions[reflectorCount].copy(bulb.position);
+    // Near lamps carry the frame; far ones must not blow out at grazing angles.
+    reflectorPower[reflectorCount]=index<3?1.0:(index<6?0.78:0.5);
+    reflectorCount++;
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   WET ASPHALT
+   The signature of the reference is not "shiny road" — it is long, broken,
+   vertically-smeared ribbons of lamp light running toward the viewer, with
+   rain rings chopping them into dashes.
+   That cannot come from billboards: the streak has to be computed per
+   fragment from the real lamp position, the real view vector and a live
+   ripple normal, so it stretches and breaks correctly at every distance
+   and every camera. This injects exactly that into the road's PBR shader,
+   added on top of the lit result the way a specular reflection is.
+   ═══════════════════════════════════════════════════════════════════ */
+const wetUniforms={
+  uWetTime:{value:0},
+  uWetFlash:{value:0},
+  uWetBolt:{value:new THREE.Vector3(-14,20,-86)},
+  uWetCam:{value:new THREE.Vector3()},
+  uReflPos:{value:reflectorPositions},
+  uReflPower:{value:reflectorPower},
+  uWetAmount:{value:quality==='mobile'?0.86:1.0}
+};
+
+const WET_CHUNK=/* glsl */`
+uniform float uWetTime,uWetFlash,uWetAmount;
+uniform vec3 uWetBolt,uWetCam;
+uniform vec3 uReflPos[${REFLECTOR_LIMIT}];
+uniform float uReflPower[${REFLECTOR_LIMIT}];
+varying vec3 vWetWorld;
+
+float wetHash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453123);}
+float wetNoise(vec2 p){
+  vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
+  return mix(mix(wetHash(i),wetHash(i+vec2(1,0)),f.x),
+             mix(wetHash(i+vec2(0,1)),wetHash(i+vec2(1,1)),f.x),f.y);
+}
+float wetFbm(vec2 p){
+  float n=0.0,a=0.55;
+  for(int i=0;i<4;i++){n+=wetNoise(p)*a;p=p*2.03+1.7;a*=0.5;}
+  return n;
+}
+
+/* Where the water actually sits. Three separate things, because they look
+   nothing alike: standing puddles with hard rims, damp streaks along the
+   traffic line, and the drained crown between them. Blending them into one
+   soft gradient is what makes CG asphalt look uniformly damp instead of
+   genuinely wet in places. */
+float puddleAt(vec2 p){
+  float field=wetFbm(p*0.38+vec2(4.0,-2.0))*0.78+wetFbm(p*0.95+vec2(-7.0,5.0))*0.30;
+  // A hard rim: water either stands here or it does not.
+  return smoothstep(0.500,0.560,field);
+}
+float wetnessAt(vec2 p){
+  float pools=puddleAt(p);
+  float streaks=smoothstep(0.40,0.70,wetFbm(vec2(p.x*2.6,p.y*0.22)+vec2(9.0,3.0)));
+  float damp=0.09+streaks*0.26;
+  return clamp(max(damp,pools),0.0,1.0);
+}
+
+/* Live surface: drifting capillary ripples plus expanding rain rings.
+   Returns the slope, which is what smears and chops the reflections. */
+vec2 rippleSlope(vec2 p,float wet){
+  float t=uWetTime;
+  vec2 slope=vec2(0.0);
+  // Fine wind-driven chop, anisotropic so the break-up runs across the road.
+  slope.x+=sin(p.x*13.0+p.y*4.2+t*1.9)*0.05;
+  slope.y+=cos(p.y*9.4-p.x*3.1+t*1.35)*0.085;
+  slope+= (vec2(wetFbm(p*5.5+vec2(t*0.35,0.0)),
+                wetFbm(p*5.5+vec2(0.0,-t*0.28)+31.0))-0.5)*0.16;
+  /* Rain rings. Only standing water rings — a damp film has nothing to
+     ripple — so the impacts are masked by the puddle field, and each ring
+     carries a smaller trailing ring behind its front the way a real impact
+     does. */
+  float pooled=puddleAt(p);
+  vec2 cell=floor(p*2.2);
+  for(int i=0;i<3;i++){
+    vec2 c=cell+vec2(float(i)-1.0);
+    float seed=wetHash(c);
+    float phase=fract(t*0.62+seed);
+    vec2 centre=(c+vec2(wetHash(c+7.0),wetHash(c+13.0)))/2.2;
+    vec2 delta=p-centre;
+    float r=length(delta);
+    float radius=phase*0.46;
+    float front=exp(-abs(r-radius)*52.0);
+    float trail=exp(-abs(r-radius*0.62)*74.0)*0.45;
+    float ring=(front+trail)*(1.0-phase)*step(0.0001,r);
+    slope+=normalize(delta+1e-5)*ring*0.72*pooled;
+  }
+  return slope*wet;
+}
+
+/* Anisotropic reflection lobe. The mismatch between the reflected view ray
+   and the light direction is measured with a tight tolerance across the
+   road and a loose one along it, which is precisely why a wet road smears
+   every lamp into a long vertical ribbon instead of a dot. */
+float streak(vec3 R,vec3 D,vec3 lateral,float tight,float smear){
+  vec3 diff=R-D;
+  float across=dot(diff,lateral);
+  float along=length(diff-lateral*across);
+  return exp(-(across*across*tight+along*along*smear));
+}
+`;
+
+const WET_APPLY=/* glsl */`
+{
+  vec3 P=vWetWorld;
+  vec3 V=normalize(uWetCam-P);
+  float wet=wetnessAt(P.xz)*uWetAmount;
+  vec2 slope=rippleSlope(P.xz,wet);
+  vec3 N=normalize(vec3(-slope.x,1.0,-slope.y));
+  // Screen-horizontal axis on the road plane: the direction the streak must
+  // stay narrow in.
+  vec3 lateral=normalize(cross(vec3(0.0,1.0,0.0),V)+1e-5);
+  vec3 R=reflect(-V,N);
+
+  // Grazing angles wet out harder: this is the Fresnel that makes distant
+  // asphalt a mirror and the asphalt under your feet merely damp.
+  float graze=pow(1.0-clamp(dot(V,vec3(0.0,1.0,0.0)),0.0,1.0),3.2);
+  float pooled=puddleAt(P.xz);
+  // Standing water is a mirror; a damp film is only a sheen. Separating the
+  // two is what produces the reference's patchwork of bright pools against
+  // near-black asphalt instead of one evenly glossy road.
+  float mirror=mix(wet*wet*0.30,0.78,pooled)*mix(0.16,1.0,graze);
+  float sharpen=mix(1.0,1.8,pooled);
+
+  vec3 refl=vec3(0.0);
+  for(int i=0;i<${REFLECTOR_LIMIT};i++){
+    float power=uReflPower[i];
+    vec3 delta=uReflPos[i]-P;
+    float dist=length(delta);
+    vec3 D=delta/max(dist,0.001);
+    float atten=1.0/(1.0+dist*dist*0.011);
+    /* Two lobes: a hot filament core and the broad wet bloom around it.
+       Inside a puddle both tighten, because a mirror scatters less — that is
+       what makes reflections in standing water read as sharp, separate
+       shapes rather than as a general glow. */
+    float core =streak(R,D,lateral,760.0*sharpen,6.5*sharpen);
+    float bloom=streak(R,D,lateral,64.0*sharpen,0.85);
+    refl+=vec3(1.0,0.62,0.18)*(core*2.10+bloom*0.62)*atten*power;
+  }
+
+  // The strike reflects too, and it is the brightest thing in the frame.
+  {
+    vec3 delta=uWetBolt-P;
+    float dist=length(delta);
+    vec3 D=delta/max(dist,0.001);
+    float lobe=streak(R,D,lateral,26.0,1.2);
+    refl+=vec3(1.0,0.80,0.42)*lobe*uWetFlash*0.80/(1.0+dist*dist*0.0018);
+  }
+
+  // Sheen: the whole wet film lifts slightly under the flash.
+  refl+=vec3(0.42,0.32,0.18)*uWetFlash*mirror*0.07;
+
+  // A puddle has a visible edge: a thin dark lip of saturated asphalt just
+  // outside the standing water. Without it the pools look painted on.
+  float rimBand=puddleAt(P.xz+vec2(0.06,0.04))-pooled;
+  gl_FragColor.rgb*=1.0-clamp(rimBand,0.0,1.0)*0.35;
+
+  gl_FragColor.rgb+=refl*mirror;
+}
+`;
+
+roadMaterial.onBeforeCompile=shader=>{
+  Object.assign(shader.uniforms,wetUniforms);
+  shader.vertexShader=shader.vertexShader
+    .replace('#include <common>','#include <common>\nvarying vec3 vWetWorld;')
+    .replace('#include <project_vertex>',
+      '#include <project_vertex>\nvWetWorld=(modelMatrix*vec4(transformed,1.0)).xyz;');
+  shader.fragmentShader=shader.fragmentShader
+    .replace('#include <common>','#include <common>\n'+WET_CHUNK)
+    // After tone-mapping-independent output assembly but before the final
+    // encode, so the streaks go through the same grade as everything else.
+    .replace('#include <dithering_fragment>','#include <dithering_fragment>\n'+WET_APPLY);
+};
+// Distinguish this program from any other MeshPhysicalMaterial in the scene.
+roadMaterial.customProgramCacheKey=()=>'ride-wet-asphalt';
+roadMaterial.needsUpdate=true;
+
+// Low amber road studs reinforce the curve and give wet asphalt small,
+// controlled highlights without turning the entire road into a mirror.
+const studGeo=new THREE.CylinderGeometry(.016,.022,.018,10);
+const studMat=new THREE.MeshStandardMaterial({
+  color:0xffbf35,emissive:0xff8a08,emissiveIntensity:1.8,
+  roughness:.22,metalness:.28
+});
+for(let i=0;i<44;i++){
+  const t=.015+i/48*.88,f=roadFrame(t);
+  for(const offset of [-.34,.34]){
+    const p=f.center.clone().addScaledVector(f.right,offset);
+    const stud=new THREE.Mesh(studGeo,studMat);
+    stud.position.set(p.x,p.y+.115,p.z);scene.add(stud);
+  }
+}
+
+function chevronTexture(){
+  return canvasTexture(256,256,(ctx,w,h)=>{
+    ctx.fillStyle='#e2a719';ctx.fillRect(0,0,w,h);
+    ctx.fillStyle='#15120a';
+    ctx.beginPath();
+    ctx.moveTo(w*.70,h*.15);ctx.lineTo(w*.35,h*.5);
+    ctx.lineTo(w*.70,h*.85);ctx.lineTo(w*.52,h*.85);
+    ctx.lineTo(w*.17,h*.5);ctx.lineTo(w*.52,h*.15);ctx.closePath();ctx.fill();
+    ctx.strokeStyle='rgba(255,221,111,.65)';ctx.lineWidth=7;ctx.strokeRect(5,5,w-10,h-10);
+  });
+}
+const signMat=new THREE.MeshStandardMaterial({
+  map:chevronTexture(),roughness:.4,metalness:.18,emissive:0xd27a00,emissiveIntensity:1.65
+});
+for(const t of [.18,.27,.37,.48,.60,.72,.83]){
+  const f=roadFrame(t);
+  const p=f.center.clone().addScaledVector(f.right,ROAD_WIDTH*.5+2.15);
+  const sign=new THREE.Mesh(new THREE.PlaneGeometry(1.0,1.0),signMat);
+  sign.position.set(p.x,p.y+1.75,p.z);
+  sign.lookAt(camera.position.x,p.y+1.6,camera.position.z);
+  scene.add(sign);
+}
+
+const rockTexture=canvasTexture(384,384,(ctx,w,h)=>{
+  ctx.fillStyle='#222426';ctx.fillRect(0,0,w,h);
+  for(let i=0;i<1800;i++){
+    const tone=18+Math.floor(random()*38);
+    ctx.fillStyle=`rgba(${tone},${tone+2},${tone+3},${.08+random()*.28})`;
+    ctx.beginPath();
+    ctx.arc(random()*w,random()*h,.25+random()*2.2,0,Math.PI*2);
+    ctx.fill();
+  }
+  for(let i=0;i<36;i++){
+    ctx.strokeStyle=`rgba(3,5,6,${.18+random()*.3})`;
+    ctx.lineWidth=.5+random()*1.4;
+    ctx.beginPath();
+    ctx.moveTo(random()*w,random()*h);
+    ctx.lineTo(random()*w,random()*h);
+    ctx.stroke();
+  }
+});
+rockTexture.repeat.set(2.2,2.2);
+const rockMat=new THREE.MeshPhysicalMaterial({
+  color:0x3a3c3d,map:rockTexture,roughness:.69,metalness:.04,
+  flatShading:false,clearcoat:.18,clearcoatRoughness:.54,envMapIntensity:.48
+});
+const rockGeo=new THREE.SphereGeometry(1,24,16);
+{
+  const p=rockGeo.attributes.position;
+  for(let i=0;i<p.count;i++){
+    const x=p.getX(i),y=p.getY(i),z=p.getZ(i);
+    const n=.84+valueNoise(x*5.7+8,y*6.1+z*3.2)*.28;
+    p.setXYZ(i,x*n,y*n,z*n);
+  }
+  p.needsUpdate=true;rockGeo.computeVertexNormals();
+}
+for(let i=0;i<(quality==='mobile'?38:66);i++){
+  const t=.075+random()*.90,f=roadFrame(t);
+  const distance=ROAD_WIDTH*.5+2.5+random()*7.5;
+  const p=f.center.clone().addScaledVector(f.right,distance);
+  const scale=1.25+random()*3.35;
+  const rock=new THREE.Mesh(rockGeo,rockMat);
+  rock.position.set(p.x,p.y+scale*.42+random()*3.5,p.z+(random()-.5)*5);
+  rock.scale.set(scale*(.75+random()*.55),scale*(1.0+random()*1.2),scale*(.7+random()*.8));
+  rock.rotation.set(random()*2,random()*Math.PI,random()*.7);
+  rock.castShadow=rock.receiveShadow=true;
+  scene.add(rock);
+}
+
+// A low silhouette closes gaps behind the individual wet rocks.
+const cliffPoints=[];
+for(let i=0;i<90;i++){
+  const t=i/89,f=roadFrame(t);
+  const p=f.center.clone().addScaledVector(f.right,ROAD_WIDTH*.5+7.5);
+  cliffPoints.push(p);
+}
+const cliffCurve=new THREE.CatmullRomCurve3(cliffPoints);
+const cliffBack=new THREE.Mesh(
+  new THREE.TubeGeometry(cliffCurve,160,5.8,7,false),
+  new THREE.MeshStandardMaterial({color:0x090b0c,roughness:.98,metalness:0})
+);
+cliffBack.position.y=4.2;cliffBack.receiveShadow=true;scene.add(cliffBack);
+
+// Distant coast and city on the open-water side.
+const city=new THREE.Group();
+const buildingMat=new THREE.MeshStandardMaterial({
+  color:0x18232c,roughness:.88,metalness:.06,emissive:0x111b24,emissiveIntensity:.88
+});
+const windowGeo=new THREE.BufferGeometry();
+const windowPositions=[],windowColors=[];
+for(let i=0;i<78;i++){
+  const x=-48+i*.53+random()*.25;
+  const z=-111-random()*7;
+  const h=.7+Math.pow(random(),2)*7;
+  const b=new THREE.Mesh(new THREE.BoxGeometry(.34+random()*.55,h,.4+random()*.7),buildingMat);
+  b.position.set(x,h*.5-.25,z);city.add(b);
+  const windows=1+Math.floor(h*1.5);
+  for(let j=0;j<windows;j++){
+    windowPositions.push(x+(random()-.5)*.28,.18+j*.42,z+.25);
+    const warm=.65+random()*.35;
+    windowColors.push(1,warm*.72,warm*.28);
+  }
+}
+windowGeo.setAttribute('position',new THREE.Float32BufferAttribute(windowPositions,3));
+windowGeo.setAttribute('color',new THREE.Float32BufferAttribute(windowColors,3));
+const cityLights=new THREE.Points(windowGeo,new THREE.PointsMaterial({
+  size:.27,vertexColors:true,transparent:true,opacity:1,
+  blending:THREE.AdditiveBlending,depthWrite:false
+}));
+city.add(cityLights);scene.add(city);
+
+// Warm shoreline lights and elongated reflections across the water.
+const shoreLightGeo=new THREE.BufferGeometry();
+const shore=[],shoreColors=[];
+for(let i=0;i<86;i++){
+  const x=-52+i*.56,z=-105+Math.sin(i*.28)*1.2;
+  shore.push(x,.18,z);shoreColors.push(1,.56,.16);
+}
+shoreLightGeo.setAttribute('position',new THREE.Float32BufferAttribute(shore,3));
+shoreLightGeo.setAttribute('color',new THREE.Float32BufferAttribute(shoreColors,3));
+scene.add(new THREE.Points(shoreLightGeo,new THREE.PointsMaterial({
+  size:.14,vertexColors:true,blending:THREE.AdditiveBlending,
+  transparent:true,opacity:.85,depthWrite:false
+})));
+
+const waterReflectionMat=new THREE.MeshBasicMaterial({
+  color:0xd79022,transparent:true,opacity:.22,
+  blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide
+});
+for(let i=0;i<28;i++){
+  const strip=new THREE.Mesh(
+    new THREE.PlaneGeometry(.035+random()*.11,.7+random()*4.2),
+    waterReflectionMat.clone()
+  );
+  strip.rotation.x=-Math.PI/2;
+  strip.position.set(-46+i*1.18+random()*.5,-.64,-100+random()*11);
+  strip.material.opacity=.08+random()*.23;
+  scene.add(strip);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   STORM SKY
+   The reference sells the shot on one thing: cumulonimbus lit from the
+   inside by the strike. That needs three things a flat fbm cannot give —
+   a cloud deck in perspective, a light source with a real world position,
+   and transmittance through the cloud toward it. All three are here.
+   ═══════════════════════════════════════════════════════════════════ */
+const skyUniforms={
+  uTime:{value:0},
+  uFlash:{value:0},
+  // Direction from the camera to the live strike. Drives every highlight.
+  uBoltDir:{value:new THREE.Vector3(-0.35,0.42,-0.84).normalize()},
+  uCityDir:{value:new THREE.Vector3(-0.62,0.02,-0.79).normalize()}
+};
+const sky=new THREE.Mesh(
+  new THREE.SphereGeometry(230,64,40),
+  new THREE.ShaderMaterial({
+    side:THREE.BackSide,depthWrite:false,uniforms:skyUniforms,
+    vertexShader:`
+      varying vec3 vDir;
+      void main(){vDir=normalize(position);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}
+    `,
+    fragmentShader:`
+      precision highp float;
+      varying vec3 vDir;
+      uniform float uTime;
+      uniform float uFlash;
+      uniform vec3 uBoltDir;
+      uniform vec3 uCityDir;
+
+      float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+      float noise(vec2 p){
+        vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
+        return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),
+                   mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);
+      }
+      const mat2 ROT=mat2(1.62,1.19,-1.19,1.62);
+      float fbm(vec2 p,int octaves){
+        float n=0.0,a=0.52;
+        for(int i=0;i<7;i++){
+          if(i>=octaves)break;
+          n+=noise(p)*a;p=ROT*p+2.1;a*=0.5;
+        }
+        return n;
+      }
+
+      /* A distant storm front is not an overhead deck — it is a wall of
+         towering cells seen roughly side-on. Mapping to azimuth/elevation
+         and compressing the elevation axis makes the cells build upward
+         instead of smearing into horizontal bands the way a ground-plane
+         projection does at a near-horizontal view. */
+      vec2 deck(vec3 d,float scale){
+        float az=atan(d.z,d.x);
+        float el=asin(clamp(d.y,-1.0,1.0));
+        return vec2(az*scale,el*scale*0.62);
+      }
+
+      /* Turbulence — the absolute value of signed noise — creates creases
+         and rounded lobes instead of the smooth hills plain fbm produces.
+         That is the difference between smoke and the cauliflower structure
+         a cumulonimbus actually has. */
+      float turbulence(vec2 p,int octaves){
+        float n=0.0,a=0.55;
+        for(int i=0;i<6;i++){
+          if(i>=octaves)break;
+          n+=abs(noise(p)*2.0-1.0)*a;
+          p=ROT*p+3.1;a*=0.5;
+        }
+        return 1.0-n;
+      }
+
+      float cloudField(vec2 uv,float t,out float detail){
+        vec2 q=vec2(fbm(uv+vec2(t*0.9,0.0),5),
+                    fbm(uv+vec2(5.2,1.3)-vec2(t*0.7,0.0),5));
+        vec2 r=vec2(fbm(uv+2.6*q+vec2(1.7,9.2)+vec2(t*0.45,0.0),5),
+                    fbm(uv+2.6*q+vec2(8.3,2.8)-vec2(t*0.35,0.0),5));
+        // Billow detail rides on the warped domain, so the lobes follow the
+        // same flow as the mass they belong to.
+        detail=turbulence(uv*3.1+3.4*r-vec2(t*1.4,0.0),4);
+        detail=pow(clamp(detail,0.0,1.0),1.7);
+        float mass=fbm(uv+3.1*r,6);
+        // Sharpening the mass is what gives the deck a silhouette instead of
+        // a gradient; storm cloud edges are hard, not feathered.
+        return clamp(mass*0.80+detail*0.26,0.0,1.5);
+      }
+
+      void main(){
+        vec3 d=normalize(vDir);
+        float up=max(d.y,0.0);
+        float t=uTime*0.0055;
+
+        /* Two layers at different scales parallax against each other, which
+           is what gives the towering, three-dimensional read. */
+        float detailLow,detailHigh;
+        float low =cloudField(deck(d,2.35),t,detailLow);
+        float high=cloudField(deck(d,5.40)+vec2(37.0,11.0),t*0.62,detailHigh);
+
+        float density=low*0.66+high*0.48;
+        density+=detailLow*0.16;
+        // Storm cover thins out straight overhead and packs at the horizon.
+        float packing=mix(1.18,0.62,smoothstep(0.02,0.72,up));
+        density*=packing;
+        // Tight cover curve: storm cells need hard edges, not a grey wash.
+        float cover=smoothstep(0.46,0.80,density);
+        // The last few degrees above the sea dissolve into haze rather than
+        // resolving cloud detail that could never be seen at that distance.
+        cover*=smoothstep(0.0,0.10,up);
+
+        /* Transmittance toward the strike: re-sample the field a step along
+           the light direction. Where the cloud thins that way, light gets
+           through and the cell glows from inside. */
+        float sd;
+        float towardLow =cloudField(deck(normalize(d+uBoltDir*0.55),2.35),t,sd);
+        float thinning=clamp((low-towardLow)*1.55+0.16,-0.4,1.2);
+        float transmit=min(0.52,exp(-max(0.0,(1.0-thinning))*2.15));
+
+        // Forward scattering around the bolt, plus a broad ambient bloom.
+        float toBolt=max(dot(d,uBoltDir),0.0);
+        float beam=pow(toBolt,40.0)*1.70+pow(toBolt,26.0)*0.13+0.004;
+
+        /* Palette straight off the reference sheet: near-black navy body,
+           slate mid-tones, amber cores, pale-gold hot spots. */
+        /* Palette. The reference sheet's storm is cool: navy, slate and
+           steel, with warmth reserved entirely for the sodium lamps on the
+           road. Amber clouds were the single biggest thing making the sky
+           read as smoke rather than as weather. */
+        const vec3 NIGHT =vec3(0.008,0.014,0.028);
+        const vec3 DEEP  =vec3(0.018,0.028,0.046);
+        const vec3 SLATE =vec3(0.055,0.070,0.098);
+        const vec3 STEEL =vec3(0.150,0.180,0.225);
+        const vec3 COOL  =vec3(0.72,0.82,1.00);
+        const vec3 AMBER =vec3(0.98,0.62,0.19);
+        const vec3 HOT   =vec3(1.00,0.94,0.82);
+
+        vec3 col=mix(NIGHT,DEEP,smoothstep(0.9,0.0,up));
+        /* Cloud body: near-black undersides, steel where a lobe turns to
+           face the open sky. The vertical term is what stops the deck
+           reading as one flat mass. */
+        float faceUp=smoothstep(0.30,0.92,detailLow);
+        vec3 body=mix(SLATE*0.13,STEEL*0.19,faceUp);
+        body=mix(body,STEEL*0.34,pow(faceUp,3.0)*smoothstep(0.10,0.45,up));
+        col=mix(col,body,cover);
+
+        /* Resting storm light: even without a strike the cell nearest the
+           city keeps a low underglow, which is what stops the sky reading as
+           a flat black plate between flashes. */
+        float rest=pow(max(dot(d,uCityDir),0.0),16.0);
+        col+=AMBER*rest*cover*0.026;
+        col+=AMBER*exp(-max(d.y,0.0)*17.0)*0.014;
+
+        /* The strike. The bolt itself stays gold, but what it does to a cloud
+           is scatter cool white through it — so the cores read white-blue and
+           only the thinnest edges keep a gold cast from the channel. */
+        float lit=uFlash*beam*transmit*(0.38+1.15*detailLow);
+        col+=COOL*lit*cover*cover*0.42;
+        col+=HOT*lit*cover*cover*pow(transmit,2.4)*0.30;
+        col+=AMBER*lit*cover*cover*0.16;
+        float rim=smoothstep(0.40,0.52,density)-smoothstep(0.58,0.78,density);
+        col+=mix(COOL,HOT,0.45)*rim*lit*1.35;
+        // Air glow: even the gaps brighten, which reads as the flash filling
+        // the whole sky rather than only the clouds.
+        col+=vec3(0.08,0.095,0.125)*uFlash*(0.30*pow(toBolt,8.0))*(1.0-cover*0.70);
+
+        // Fine grain keeps the huge smooth gradients from banding.
+        col+=(hash(gl_FragCoord.xy+uTime)-0.5)*0.006;
+        gl_FragColor=vec4(max(col,0.0),1.0);
+      }
+    `
+  })
+);
+scene.add(sky);
+
+/* ═══════════════════════════════════════════════════════════════════
+   LIGHTNING
+   A real strike is a fractal: one main channel that steps toward ground,
+   shedding shorter branches that shed shorter branches again, every
+   segment thinner than its parent. Three variants are built once and
+   cycled, so the shot never replays the same silhouette twice in a row.
+   ═══════════════════════════════════════════════════════════════════ */
+const boltMaterial=new THREE.MeshBasicMaterial({
+  color:0xfff6d2,transparent:true,opacity:0,
+  blending:THREE.AdditiveBlending,depthWrite:false,fog:false
+});
+const boltGlowMaterial=new THREE.MeshBasicMaterial({
+  color:0xffab27,transparent:true,opacity:0,
+  blending:THREE.AdditiveBlending,depthWrite:false,fog:false
+});
+
+function boltChannel(start,end,{segments,spread,radius,sag=0}){
+  const points=[start.clone()];
+  const axis=end.clone().sub(start);
+  // A channel wanders perpendicular to its own run, not along fixed axes,
+  // or every branch ends up leaning the same way.
+  const side=new THREE.Vector3(-axis.z,0,axis.x).normalize();
+  const lift=new THREE.Vector3().crossVectors(axis,side).normalize();
+  for(let i=1;i<segments;i++){
+    const t=i/segments;
+    const taper=1-t*0.42;
+    const point=start.clone().lerp(end,t)
+      .addScaledVector(side,(random()-0.5)*spread*taper)
+      .addScaledVector(lift,(random()-0.5)*spread*0.62*taper);
+    point.y-=Math.sin(t*Math.PI)*sag;
+    points.push(point);
+  }
+  points.push(end.clone());
+  const curve=new THREE.CatmullRomCurve3(points);
+  return {
+    core:new THREE.Mesh(new THREE.TubeGeometry(curve,segments*2,radius,5,false),boltMaterial),
+    glow:new THREE.Mesh(new THREE.TubeGeometry(curve,segments*2,radius*3.6,5,false),boltGlowMaterial),
+    curve
+  };
+}
+
+/** One strike: main channel plus two generations of forks. */
+function buildStrike(origin,ground){
+  const group=new THREE.Group();
+  group.visible=false;
+  const main=boltChannel(origin,ground,{segments:26,spread:2.4,radius:0.055,sag:1.2});
+  group.add(main.glow,main.core);
+  const forks=[];
+  for(let i=0;i<5;i++){
+    // Forks leave the channel low and shoot away and downward.
+    const t=0.18+i*0.15+random()*0.06;
+    const from=main.curve.getPoint(Math.min(0.94,t));
+    const drop=(1-t)*0.62+0.18;
+    const to=from.clone().add(new THREE.Vector3(
+      (random()-0.5)*26,
+      -drop*(9+random()*15),
+      (random()-0.5)*16
+    ));
+    const branch=boltChannel(from,to,{segments:12,spread:1.5,radius:0.026});
+    group.add(branch.glow,branch.core);
+    forks.push({from,to,curve:branch.curve});
+  }
+  // Third generation: short whiskers off the forks, the detail that makes
+  // the silhouette read as lightning rather than as cracked glass.
+  for(const fork of forks){
+    if(random()<0.42) continue;
+    const from=fork.curve.getPoint(0.35+random()*0.4);
+    const to=from.clone().add(new THREE.Vector3(
+      (random()-0.5)*11,-(3+random()*7),(random()-0.5)*8
+    ));
+    const twig=boltChannel(from,to,{segments:7,spread:0.9,radius:0.013});
+    group.add(twig.glow,twig.core);
+  }
+  group.userData.origin=origin.clone();
+  group.userData.mid=origin.clone().lerp(ground,0.42);
+  return group;
+}
+
+// Three strike sites spread across the storm front behind the city.
+const STRIKE_SITES=[
+  {origin:new THREE.Vector3(-15,38,-88),  ground:new THREE.Vector3(-12.2,0.6,-95)},
+  {origin:new THREE.Vector3(-34,44,-104), ground:new THREE.Vector3(-29.5,0.6,-110)},
+  {origin:new THREE.Vector3(4,41,-96),    ground:new THREE.Vector3(1.5,0.6,-101)}
+];
+const strikes=STRIKE_SITES.map(({origin,ground})=>{
+  const group=buildStrike(origin,ground);
+  scene.add(group);
+  return group;
+});
+let activeStrike=strikes[0];
+activeStrike.visible=true;
+
+// The flash is a light, not just a colour grade: it has to land on the
+// asphalt, the guardrails and the rocks for the frame to feel struck.
+const flashLight=new THREE.PointLight(0xffcf62,0,220,1.25);
+flashLight.position.copy(activeStrike.userData.mid);
+scene.add(flashLight);
+// A second, low fill throws the flash forward down the road toward camera.
+const flashFill=new THREE.DirectionalLight(0xffc257,0);
+flashFill.position.set(-24,26,-70);
+flashFill.target.position.set(2,0,-10);
+scene.add(flashFill,flashFill.target);
+
+function radialTexture(colorStops){
+  return canvasTexture(256,256,(ctx,w,h)=>{
+    const g=ctx.createRadialGradient(w/2,h/2,0,w/2,h/2,w/2);
+    colorStops.forEach(([at,color])=>g.addColorStop(at,color));
+    ctx.fillStyle=g;ctx.fillRect(0,0,w,h);
+  });
+}
+/* The strike's atmospheric bloom. A bolt this size lights the air around
+   it, and without this halo the channel reads as a decal on the sky. */
+const boltHalo=new THREE.Sprite(new THREE.SpriteMaterial({
+  map:radialTexture([
+    [0.00,'rgba(255,246,214,0.95)'],
+    [0.12,'rgba(255,206,110,0.52)'],
+    [0.38,'rgba(255,158,40,0.16)'],
+    [1.00,'rgba(255,140,20,0)']
+  ]),
+  color:0xffd479,transparent:true,opacity:0,
+  blending:THREE.AdditiveBlending,depthWrite:false,fog:false
+}));
+boltHalo.scale.set(96,96,1);
+boltHalo.position.copy(activeStrike.userData.mid);
+scene.add(boltHalo);
+
+const hazeTexture=radialTexture([[0,'rgba(128,160,188,.18)'],[1,'rgba(0,0,0,0)']]);
+const hazeMat=new THREE.SpriteMaterial({
+  map:hazeTexture,color:0x536978,transparent:true,opacity:.22,
+  blending:THREE.AdditiveBlending,depthWrite:false
+});
+for(let i=0;i<10;i++){
+  const s=new THREE.Sprite(hazeMat.clone());
+  s.position.set(-28+random()*50,2+random()*9,-35-random()*95);
+  s.scale.set(22+random()*38,8+random()*16,1);scene.add(s);
+}
+
+const rainCount=quality==='mobile'?320:760;
+const rainPositions=new Float32Array(rainCount*3);
+const rainSpeed=new Float32Array(rainCount);
+for(let i=0;i<rainCount;i++){
+  rainPositions[i*3]=(random()-.5)*62;
+  rainPositions[i*3+1]=random()*26;
+  rainPositions[i*3+2]=14-random()*100;
+  rainSpeed[i]=12+random()*19;
+}
+const rainGeo=new THREE.BufferGeometry();
+rainGeo.setAttribute('position',new THREE.BufferAttribute(rainPositions,3));
+const rain=new THREE.Points(rainGeo,new THREE.PointsMaterial({
+  color:0xa9bdce,size:.009,transparent:true,opacity:.045,
+  depthWrite:false,blending:THREE.AdditiveBlending
+}));
+scene.add(rain);
+
+const composer=new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene,camera));
+const bloomPass=new UnrealBloomPass(new THREE.Vector2(1,1),.31,.42,.88);
+composer.addPass(bloomPass);
+const gradePass=new ShaderPass({
+  uniforms:{tDiffuse:{value:null},uResolution:{value:new THREE.Vector2(1,1)}},
+  vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+  fragmentShader:`
+    precision highp float;
+    varying vec2 vUv;
+    uniform sampler2D tDiffuse;
+    uniform vec2 uResolution;
+    void main(){
+      vec3 c=texture2D(tDiffuse,vUv).rgb;
+      c=mix(c,c*vec3(.86,.94,1.04),.18);
+      c+=max(c-vec3(.58),0.0)*vec3(.18,.075,-.02);
+      float vignette=smoothstep(.84,.25,length((vUv-.5)*vec2(uResolution.x/uResolution.y*.55,1.0)));
+      c*=mix(.76,1.0,vignette);
+      float textSafe=smoothstep(.59,.97,vUv.x);
+      c*=mix(1.0,.52,textSafe);
+      gl_FragColor=vec4(c,1.0);
+    }
+  `
+});
+composer.addPass(gradePass);
+composer.addPass(new OutputPass());
+
+// The shared hero camera. bike-scene.embed.html installs the identical
+// projection, which is what keeps the vehicle glued to this asphalt.
+function updateCamera(){
+  applyHeroCamera(camera,innerWidth,innerHeight);
+}
+
+function resize(){
+  const w=innerWidth,h=innerHeight;
+  renderer.setPixelRatio(Math.min(devicePixelRatio||1,DPR_CAP));
+  renderer.setSize(w,h,false);
+  camera.aspect=w/h;
+  updateCamera();
+  composer.setPixelRatio(renderer.getPixelRatio());
+  composer.setSize(w,h);
+  gradePass.uniforms.uResolution.value.set(w,h);
+}
+addEventListener('resize',resize,{passive:true});
+resize();
+
+const clock=new THREE.Clock();
+let sceneActive=true;
+let elapsed=0;
+/* A real cloud-to-ground strike is a burst of return strokes a few tens of
+   milliseconds apart, each dimmer than the last, riding on a slower glow as
+   the channel cools. Modelling that — rather than one smooth pulse — is what
+   makes the flash read as lightning instead of as a fading lamp. */
+const STRIKE_PERIOD=6.2;
+function lightningEnergy(t){
+  if(reducedMotion)return .10;
+  const cycle=t%STRIKE_PERIOD;
+  const stroke=(at,width,gain)=>
+    gain*Math.exp(-Math.pow(Math.abs(cycle-at)/width,1.35));
+  // Leader, main return stroke, then three weaker restrikes.
+  const strokes=
+    stroke(0.10,0.030,0.34)+
+    stroke(0.18,0.050,1.00)+
+    stroke(0.29,0.032,0.62)+
+    stroke(0.40,0.028,0.44)+
+    stroke(0.58,0.045,0.28);
+  // Channel afterglow: a long, low tail that keeps the clouds lit.
+  const afterglow=cycle>0.16&&cycle<2.4
+    ? 0.20*Math.exp(-(cycle-0.16)*1.9)
+    : 0;
+  // A distant sheet flash halfway through the cycle keeps the sky alive.
+  const sheet=0.13*Math.exp(-Math.pow(Math.abs(cycle-3.45)/0.30,1.6));
+  return clamp(strokes+afterglow+sheet,0,1.6);
+}
+
+// Which strike site is live this cycle. Cycling the silhouette stops the
+// storm from looking like a single looping asset.
+let strikeCycle=-1;
+const boltDirection=new THREE.Vector3();
+function syncStrike(t){
+  const index=Math.floor(t/STRIKE_PERIOD)%strikes.length;
+  if(index===strikeCycle) return;
+  strikeCycle=index;
+  activeStrike.visible=false;
+  activeStrike=strikes[index];
+  activeStrike.visible=true;
+  flashLight.position.copy(activeStrike.userData.mid);
+  boltHalo.position.copy(activeStrike.userData.mid);
+  wetUniforms.uWetBolt.value.copy(activeStrike.userData.mid);
+  waterUniforms.uSeaBolt.value.copy(activeStrike.userData.mid);
+  flashFill.position.copy(activeStrike.userData.origin);
+  boltDirection.copy(activeStrike.userData.mid).sub(camera.position).normalize();
+  skyUniforms.uBoltDir.value.copy(boltDirection);
+}
+function updateRain(dt){
+  const pos=rainGeo.attributes.position.array;
+  for(let i=0;i<rainCount;i++){
+    pos[i*3+1]-=rainSpeed[i]*dt;
+    pos[i*3]+=.9*dt;
+    if(pos[i*3+1]<-.4){
+      pos[i*3+1]=18+random()*9;
+      pos[i*3]=(random()-.5)*62;
+      pos[i*3+2]=14-random()*100;
+    }
+  }
+  rainGeo.attributes.position.needsUpdate=true;
+}
+function draw(){
+  const dt=Math.min(clock.getDelta(),.05);
+  elapsed=Number.isFinite(fixedTime)?fixedTime:elapsed+dt;
+  syncStrike(elapsed);
+  const energy=lightningEnergy(elapsed);
+
+  skyUniforms.uTime.value=elapsed;
+  /* The bolt itself has to clip white at peak, but the cloud deck must not:
+     a linear sky response turned every strike into a flat tan plate. This
+     soft-saturating curve keeps the cells reading as lit billows with dark
+     bodies right through the brightest return stroke. */
+  skyUniforms.uFlash.value=energy/(1.0+energy*1.55);
+
+  // The channel itself clips hard while the halo around it stays soft; that
+  // difference in falloff is what sells the temperature of the strike.
+  boltMaterial.opacity=clamp(energy*1.35,0,1);
+  boltGlowMaterial.opacity=clamp(energy*.22,0,.30);
+  boltHalo.material.opacity=clamp(energy*.22,0,.30);
+  const haloSpan=24+energy*15;
+  boltHalo.scale.set(haloSpan,haloSpan,1);
+  flashLight.intensity=energy*30;
+  flashFill.intensity=energy*0.55;
+  bloomPass.strength=.29+energy*.15;
+
+  // The road and the sea both have to catch the strike, or the flash reads
+  // as a sky-only effect pasted over a static plate.
+  wetUniforms.uWetTime.value=elapsed;
+  wetUniforms.uWetFlash.value=energy;
+  wetUniforms.uWetCam.value.copy(camera.position);
+  waterUniforms.uSeaTime.value=elapsed;
+  waterUniforms.uSeaFlash.value=energy;
+  waterUniforms.uSeaCam.value.copy(camera.position);
+
+  // Sodium lamps flicker, and they surge for a moment after a nearby strike.
+  lamps.forEach(({light,baseIntensity},i)=>{
+    light.intensity=baseIntensity*(.978+.022*Math.sin(elapsed*.7+i)+energy*.10);
+  });
+
+  if(!reducedMotion) updateRain(dt);
+  water.material.roughness=.15+Math.sin(elapsed*.23)*.012;
+
+  /* The product rides in a separate WebGL2 layer that cannot see this scene's
+     lights. Publishing the strike energy lets the hero light the vehicle with
+     the same lightning, which is the difference between two stacked renders
+     and one photograph. */
+  if(window.parent!==window && Math.abs(energy-publishedFlash)>0.012){
+    publishedFlash=energy;
+    window.parent.postMessage(
+      {type:'storm-flash',energy},
+      location.origin==='null'?'*':location.origin
+    );
+  }
+  composer.render();
+}
+let publishedFlash=-1;
+renderer.setAnimationLoop(draw);
+document.addEventListener('visibilitychange',()=>{
+  clock.getDelta();
+  renderer.setAnimationLoop(document.hidden||!sceneActive?null:draw);
+});
+addEventListener('message',event=>{
+  if(event.origin!==location.origin&&event.origin!=='null')return;
+  if(event.data?.type!=='ride-scene-active')return;
+  sceneActive=Boolean(event.data.active);
+  clock.getDelta();
+  renderer.setAnimationLoop(sceneActive&&!document.hidden?draw:null);
+});
+
+window.__roadScene={
+  THREE,scene,camera,renderer,composer,road,roadCurve,roadWidth:ROAD_WIDTH,
+  getPerformanceMetrics:()=>({
+    webgl2:renderer.capabilities.isWebGL2,
+    dpr:renderer.getPixelRatio(),
+    drawCalls:renderer.info.render.calls,
+    triangles:renderer.info.render.triangles,
+    geometries:renderer.info.memory.geometries,
+    textures:renderer.info.memory.textures
+  }),
+  setTime:value=>{elapsed=Number(value)||0;draw();},
+  capture:()=>({
+    camera:camera.position.toArray(),
+    roadVertices:road.geometry.attributes.position.count,
+    webgl2:renderer.capabilities.isWebGL2
+  })
+};
+</script>
+</body>
+</html>
