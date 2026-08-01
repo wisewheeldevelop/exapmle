@@ -26,7 +26,7 @@ import {
 export function createRideDirector(options){
   const {
     THREE, scene, camera, controls, renderer, composer, grade, bloom,
-    products, dimensions, applySteering, query, onProductChanged, rig
+    products, dimensions, applySteering, query, onProductChanged, rig, dprCap
   } = options;
 
   const FIXED_DT = 1 / 120;
@@ -977,11 +977,15 @@ export function createRideDirector(options){
   }
 
   function configureQuality(){
+    /* The host scene has already decided this device's resolution ceiling from
+       its hardware. A second, independent ladder here would quietly overrule
+       it — which is exactly what kept phones rendering at 1.35x. */
     const caps = {low:1, medium:1.35, high:1.75, ultra:2.15};
+    const ceiling = Number.isFinite(dprCap) ? dprCap : caps[quality];
     const requested = Number.parseFloat(query.get('dpr'));
     const dpr = Number.isFinite(requested)
-      ? clamp(requested, .75, 2.25)
-      : Math.min(devicePixelRatio, caps[quality]);
+      ? clamp(requested, .75, ceiling)
+      : Math.min(devicePixelRatio, ceiling);
     renderer.setPixelRatio(dpr);
     composer.setPixelRatio(dpr);
     return dpr;

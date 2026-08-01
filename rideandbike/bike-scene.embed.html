@@ -146,6 +146,33 @@ import { ShaderPass }       from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass }       from 'three/addons/postprocessing/OutputPass.js';
 import { createRideDirector } from './ride-director.js';
 import { createFreeRide }     from './free-ride.js';
+import { createPerfGovernor } from './perf-governor.js';
+
+/* WebGL contexts are revocable. On a phone with several of them the browser
+   will eventually take one back, and the default behaviour is a canvas that
+   stays black for the rest of the session. Preventing the default keeps the
+   context restorable; the host swaps in a poster while we are dark. */
+function reportToHost(type, extra){
+  if(window.parent === window) return;
+  window.parent.postMessage(
+    Object.assign({type}, extra || {}),
+    location.origin === 'null' ? '*' : location.origin
+  );
+}
+document.getElementById('stage').addEventListener('webglcontextlost', event=>{
+  event.preventDefault();
+  CONTEXT_LOST = true;
+  reportToHost('scene-context-lost');
+}, false);
+document.getElementById('stage').addEventListener('webglcontextrestored', ()=>{
+  CONTEXT_LOST = false;
+  firstFrameSent = false;
+  reportToHost('scene-context-restored');
+  resize();
+  startLoop();
+}, false);
+let CONTEXT_LOST = false;
+let firstFrameSent = false;
 
 window.addEventListener('error', e=>{
   const el=document.getElementById('err'); el.style.display='block';
@@ -209,8 +236,24 @@ const renderer = new THREE.WebGLRenderer({
   canvas, context: gl2 || undefined,
   antialias:true, alpha:true, powerPreference:'high-performance'
 });
+/* Quality tier. A phone's pixel ratio is a lie for our purposes: a 3x panel
+   asks us to shade nine times the fragments of a 1x one for a scene whose
+   subject is a few hundred pixels wide either way. Everything expensive —
+   resolution, shadow map size, post-processing — is chosen from this one
+   decision so the tiers cannot drift apart. */
+const COARSE   = matchMedia('(pointer: coarse)').matches;
+const LOW_END  = (navigator.deviceMemory && navigator.deviceMemory <= 4)
+              || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4);
+const TIER     = COARSE || innerWidth < 900 ? (LOW_END ? 'low' : 'mobile') : 'desktop';
+const DPR_CAP  = TIER === 'low' ? 1.0 : TIER === 'mobile' ? 1.2 : 2.0;
+const DETAIL_SHADOWS = TIER === 'desktop';
+const SHADOW_SIZE = TIER === 'low' ? 512 : TIER === 'mobile' ? 768 : 2048;
+window.__sceneTier = TIER;
+
 const requestedDpr=Number.parseFloat(new URLSearchParams(location.search).get('dpr'));
-renderer.setPixelRatio(Number.isFinite(requestedDpr)?Math.min(Math.max(requestedDpr,.75),2.25):Math.min(devicePixelRatio,innerWidth<600?1.75:2.25));
+renderer.setPixelRatio(Number.isFinite(requestedDpr)
+  ? Math.min(Math.max(requestedDpr,.75),DPR_CAP)
+  : Math.min(devicePixelRatio,DPR_CAP));
 renderer.setSize(innerWidth, innerHeight);
 renderer.setClearColor(0x000000, 0);
 renderer.outputColorSpace   = THREE.SRGBColorSpace;
@@ -219,7 +262,7 @@ renderer.outputColorSpace   = THREE.SRGBColorSpace;
 // keeps both the frame's shadow detail and the volt yellow intact.
 renderer.toneMapping        = THREE.NeutralToneMapping;
 renderer.toneMappingExposure= 1.35;
-renderer.shadowMap.enabled  = true;
+renderer.shadowMap.enabled  = DETAIL_SHADOWS;
 renderer.shadowMap.type     = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
@@ -306,7 +349,7 @@ scene.add(productRig);
 const key = new THREE.DirectionalLight(0xffffff, 3.6);
 key.position.set(3.2, 5.4, 3.4);
 key.castShadow = true;
-key.shadow.mapSize.set(2048,2048);
+key.shadow.mapSize.set(SHADOW_SIZE,SHADOW_SIZE);
 key.shadow.camera.near = 0.5;  key.shadow.camera.far = 16;
 key.shadow.camera.left=-3.4; key.shadow.camera.right=3.4;
 key.shadow.camera.top =3.4;  key.shadow.camera.bottom=-2.2;
@@ -495,6 +538,7 @@ function decal(w,h,texture){
 }
 
 function boltZ(r=0.009,len=0.008,mat=M.fastener,seg=20){
+  seg = SEG(seg, DETAIL.cyl, 6);
   const b=cylZ(r,r,len,mat,seg);
   const slot=slab(r*1.25,r*.18,len*.08,M.plastic,.001);
   slot.position.z=len*.52;b.add(slot);return b;
@@ -509,6 +553,23 @@ function cable(points,r=0.0036){
 /* ═══════════════════════════════════════════════════════════════════
    4 · GEOMETRY HELPERS
    ═══════════════════════════════════════════════════════════════════ */
+/* Geometry budget.
+   Measured on the assembled bike: 287k triangles across 405 meshes, of which
+   RoundedBoxGeometry alone was 241k and 272k cast shadows — so a phone was
+   transforming well over half a million vertices and issuing 800+ draw calls
+   every frame for a subject a few hundred pixels tall.
+
+   Nothing here changes a single dimension of the model. Only how finely each
+   primitive is tessellated, and whether the shadow pass runs at all. */
+const DETAIL = TIER === 'desktop'
+  ? {slab:4, knob:2, knobDensity:1.00, lathe:1.00, cyl:1.00, shadows:true}
+  : TIER === 'mobile'
+    ? {slab:1, knob:1, knobDensity:0.70, lathe:0.55, cyl:0.62, shadows:false}
+    : {slab:1, knob:1, knobDensity:0.50, lathe:0.42, cyl:0.50, shadows:false};
+/** Scale a segment count, never below what still reads as round. */
+const SEG = (count, scale, floor = 8) =>
+  Math.max(floor, Math.round(count * scale));
+
 const V = (x,y,z)=>new THREE.Vector3(x,y,z);
 const UP_Y = V(0,1,0);
 
@@ -516,7 +577,7 @@ const UP_Y = V(0,1,0);
 function tube(a, b, r1, r2, mat, seg=24){
   const dir = new THREE.Vector3().subVectors(b,a);
   const len = dir.length();
-  const g = new THREE.CylinderGeometry(r2, r1, len, seg, 1, false);
+  const g = new THREE.CylinderGeometry(r2, r1, len, SEG(seg,DETAIL.cyl,6), 1, false);
   const m = new THREE.Mesh(g, mat);
   m.position.copy(a).addScaledVector(dir, 0.5);
   m.quaternion.setFromUnitVectors(UP_Y, dir.normalize());
@@ -538,14 +599,14 @@ function capsule(a, b, r, mat, seg=18){
 /** rounded box */
 function slab(w,h,d, mat, r=0.012){
   const radius=Math.max(0.001,Math.min(r,w*.22,h*.22,d*.22));
-  const m = new THREE.Mesh(new RoundedBoxGeometry(w,h,d,4,radius), mat);
+  const m = new THREE.Mesh(new RoundedBoxGeometry(w,h,d,DETAIL.slab,radius), mat);
   m.castShadow = m.receiveShadow = true;
   return m;
 }
 
 /** lathe revolved around Y then tipped so the axis lies on Z (wheel plane = XY) */
 function latheZ(pts, mat, seg=64){
-  const g = new THREE.LatheGeometry(pts, seg);
+  const g = new THREE.LatheGeometry(pts, SEG(seg,DETAIL.lathe,14));
   g.rotateX(Math.PI/2);
   const m = new THREE.Mesh(g, mat);
   m.castShadow = m.receiveShadow = true;
@@ -563,6 +624,7 @@ function discZ(r, thick, mat, seg=48){
 
 /** cylinder whose axis is Z (hubs, motors) */
 function cylZ(r1, r2, len, mat, seg=32){
+  seg = SEG(seg, DETAIL.cyl, 8);
   const g = new THREE.CylinderGeometry(r1, r2, len, seg);
   g.rotateX(Math.PI/2);
   const m = new THREE.Mesh(g, mat);
@@ -618,7 +680,11 @@ function pair(build, z){
    ═══════════════════════════════════════════════════════════════════ */
 function buildWheel(o){
   const {R, rimR, W, spokes=36, rotorR=0, motorR=0, hubR=0.030,
-         knobRows=5, knobsPer=30, rimMat=M.anod, rimAccent=false} = o;
+         knobRows: knobRowsIn=5, knobsPer: knobsPerIn=30,
+         rimMat=M.anod, rimAccent=false} = o;
+  // Tread cost is rows x knobs x geometry, so the density budget lands here.
+  const knobRows = Math.max(3, Math.round(knobRowsIn * (DETAIL.knobDensity > 0.6 ? 1 : 0.8)));
+  const knobsPer = Math.max(12, Math.round(knobsPerIn * DETAIL.knobDensity));
   const g = new THREE.Group();
   const hw = W/2;
 
@@ -662,7 +728,7 @@ function buildWheel(o){
 
   /* — knobs: instanced blocks, staggered rows, shoulder rows tilted — */
   const kw = W*0.155, kh = 0.020, kd = W*0.135;
-  const knobGeo = new RoundedBoxGeometry(kw,kh,kd,2,Math.min(kh*.22,.0035));
+  const knobGeo = new RoundedBoxGeometry(kw,kh,kd,DETAIL.knob,Math.min(kh*.22,.0035));
   const rows = [];
   const halfRows = (knobRows-1)/2;
   for(let r=0;r<knobRows;r++){
@@ -1528,6 +1594,24 @@ floorBase.rotation.x = -Math.PI/2;
 floorBase.renderOrder = -2;
 productRig.add(floorBase);
 
+/* Contact shadow without a shadow pass. The real map is worth its cost on a
+   desktop close-up; on a phone the same read comes from a soft ellipse that
+   travels with the rig, for two triangles and no extra render. */
+const blobShadow = new THREE.Mesh(
+  new THREE.CircleGeometry(1.05, 28),
+  new THREE.MeshBasicMaterial({
+    map: radialTex(0, 256, [
+      [0.00,'rgba(0,0,0,0.52)'],
+      [0.42,'rgba(0,0,0,0.28)'],
+      [1.00,'rgba(0,0,0,0)']]),
+    transparent: true, depthWrite: false, opacity: DETAIL_SHADOWS ? 0 : 1
+  }));
+blobShadow.rotation.x = -Math.PI/2;
+blobShadow.position.y = 0.004;
+blobShadow.scale.set(1, 0.46, 1);
+blobShadow.renderOrder = -1;
+blobShadow.visible = !DETAIL_SHADOWS;
+
 const shadowCatcher = new THREE.Mesh(
   new THREE.CircleGeometry(4.2, 64),
   new THREE.ShadowMaterial({ opacity:0.62, transparent:true }));
@@ -1535,7 +1619,8 @@ shadowCatcher.rotation.x = -Math.PI/2;
 shadowCatcher.position.y = 0.0015;
 shadowCatcher.receiveShadow = true;
 shadowCatcher.renderOrder = -1;
-productRig.add(shadowCatcher);
+productRig.add(shadowCatcher, blobShadow);
+shadowCatcher.visible = DETAIL_SHADOWS;
 
 const pool = new THREE.Mesh(new THREE.CircleGeometry(2.4, 64),
   new THREE.MeshBasicMaterial({
@@ -1746,7 +1831,7 @@ function updateBolt(dt){
    12 · POST-PROCESSING
    ═══════════════════════════════════════════════════════════════════ */
 const composer = new EffectComposer(renderer);
-composer.setPixelRatio(Math.min(devicePixelRatio, 2));
+composer.setPixelRatio(Math.min(devicePixelRatio, DPR_CAP));
 composer.setSize(innerWidth, innerHeight);
 composer.addPass(new RenderPass(scene, camera));
 
@@ -1898,7 +1983,7 @@ addEventListener('message',event=>{
   if(event.origin!==location.origin&&event.origin!=='null')return;
   if(event.data?.type==='ride-scene-active'){
     SCENE_ACTIVE=Boolean(event.data.active);
-    clock.getDelta();
+    if(SCENE_ACTIVE) startLoop(); else stopLoop();
   }else if(event.data?.type==='storm-flash'){
     applyStormFlash(event.data.energy);
   }
@@ -1932,14 +2017,14 @@ if(RIDE_MODE && RIDE_MODE !== 'showcase'){
   // The hero rasterises this layer across the whole viewport, and the rig
   // moves every frame so the shadow map cannot be cached. At hero scale a
   // 1024² map is indistinguishable from 2048² and costs a quarter as much.
-  key.shadow.mapSize.set(1024, 1024);
+  key.shadow.mapSize.set(Math.min(SHADOW_SIZE,1024), Math.min(SHADOW_SIZE,1024));
   key.shadow.map?.dispose();
   key.shadow.map = null;
 }
 
 const rideDirector = createRideDirector({
   THREE, scene, camera, controls, renderer, composer, grade, bloom,
-  rig:productRig,
+  rig:productRig, dprCap:DPR_CAP,
   products:{bike,scooter},
   dimensions:{
     bike:{wheelRadius:BIKE.R,wheelbase:BIKE.wb,frontTravel:.085,rearTravel:.060},
@@ -2030,14 +2115,28 @@ if(Q.get('bolt') === '1'){
   if(QA_STATIC) boltFreeze = true;      // hold at peak so a still can catch it
 }
 
+/* Scissor state. Declared before resize() so the initial layout pass, which
+   resets it, cannot run into the temporal dead zone. */
+const scissorBox = new THREE.Box3();
+const scissorPoint = new THREE.Vector3();
+let previousRect = null;
+
+const governor=createPerfGovernor({
+  renderer, composer,
+  baseRatio:Math.min(devicePixelRatio,DPR_CAP),
+  targetMs:1000/60,
+  minScale:0.72,
+  enabled:TIER!=='desktop',
+  onChange:()=>{ previousRect=null; resize(); }
+});
+
 function resize(){
   const w = innerWidth, h = innerHeight;
   let activeDpr=Math.min(devicePixelRatio,2);
+  previousRect=null;
   if(freeRide){
     // The chase camera owns framing; resize only has to keep the buffers right.
-    activeDpr=Math.min(devicePixelRatio,1.8);
-    renderer.setPixelRatio(activeDpr);
-    composer.setPixelRatio(activeDpr);
+    activeDpr=governor.reapply();
     camera.aspect=w/h;
     camera.updateProjectionMatrix();
     renderer.setSize(w,h);
@@ -2059,16 +2158,31 @@ function resize(){
 }
 addEventListener('resize', resize);
 document.addEventListener('visibilitychange',()=>{
-  clock.getDelta();
   rideDirector.setActive(!document.hidden&&SCENE_ACTIVE);
+  if(document.hidden) stopLoop(); else startLoop();
 });
 resize();
 
+/* A suspended scene must stop scheduling frames, not skip work inside frames
+   it keeps scheduling. Three idle scenes each waking the compositor sixty
+   times a second is most of why a phone with several embeds feels sticky. */
+let loopHandle = 0;
+function startLoop(){
+  if(loopHandle || !SCENE_ACTIVE || CONTEXT_LOST || document.hidden) return;
+  clock.getDelta();               // drop the time spent asleep
+  loopHandle = requestAnimationFrame(tick);
+}
+function stopLoop(){
+  if(!loopHandle) return;
+  cancelAnimationFrame(loopHandle);
+  loopHandle = 0;
+}
+
 function tick(){
-  requestAnimationFrame(tick);
+  loopHandle = requestAnimationFrame(tick);
   const dt = Math.min(clock.getDelta(), 0.05);
   const et = clock.elapsedTime;
-  if(!SCENE_ACTIVE) return;
+  if(CONTEXT_LOST){ stopLoop(); return; }
 
   if(playing){
     timeline += dt*2.5;
@@ -2112,11 +2226,37 @@ function tick(){
   }
 
   if(!RIDE_MODE||RIDE_MODE==='showcase')controls.update();
-  if(transparentHeroRender)renderer.render(scene,camera);
+  if(transparentHeroRender){
+    /* This layer is a full-viewport transparent pane, but the vehicle only
+       ever occupies a fraction of it. Shading the rest is pure waste: those
+       pixels run the whole PBR path only to be discarded as transparent.
+
+       The projection is left exactly as it was — the shared hero camera is
+       untouched, so alignment with the road layer holds to the pixel — and a
+       scissor rectangle simply forbids writes outside the vehicle's
+       screen-space bounds. Identical image, a fraction of the fill. */
+    const box = heroScissorRect();
+    if(box){
+      renderer.setScissorTest(true);
+      renderer.setScissor(box.x, box.y, box.w, box.h);
+      renderer.setViewport(0, 0, innerWidth, innerHeight);
+      // autoClear is on, so render() clears inside the scissor for us.
+      renderer.render(scene,camera);
+      renderer.setScissorTest(false);
+    }else{
+      renderer.clear();
+    }
+  }
   else composer.render();
   rideDirector.reportFrame(dt);
+  governor.sample();
 
   if(firstFrame){ firstFrame = false; const b=$('boot'); if(b) b.classList.add('gone'); }
+  if(!firstFrameSent){
+    // The host holds a poster over this canvas until real pixels exist.
+    firstFrameSent = true;
+    reportToHost('scene-first-frame');
+  }
 
   // ── HUD ──
   const prog = timeline / TOTAL;
@@ -2131,11 +2271,64 @@ function tick(){
                   fpsAcc=0; fpsN=0; fpsT=0; }
 }
 
+/* Screen-space bounds of everything this layer can draw, in the scissor's
+   bottom-left pixel coordinates. Unioning with the previous frame's box is
+   what stops a moving vehicle from smearing: the region it has just vacated
+   must be cleared too, and the clear is itself scissored. */
+/* All rectangles below are CSS pixels with the origin at the bottom-left:
+   WebGLRenderer.setScissor multiplies by the pixel ratio itself, so handing
+   it device pixels would apply the ratio twice. */
+function fullRect(){
+  previousRect = null;
+  return {x:0, y:0, w:innerWidth, h:innerHeight};
+}
+function heroScissorRect(){
+  const object = scooter.visible ? scooter : bike;
+  if(!object || !object.visible) return null;
+  object.updateMatrixWorld(true);
+  scissorBox.setFromObject(object);
+  if(scissorBox.isEmpty()) return fullRect();
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for(const x of [scissorBox.min.x, scissorBox.max.x])
+    for(const y of [scissorBox.min.y, scissorBox.max.y])
+      for(const z of [scissorBox.min.z, scissorBox.max.z]){
+        scissorPoint.set(x,y,z).project(camera);
+        // A corner behind the camera projects to nonsense; the safe answer
+        // then is the whole screen, never a confidently wrong rectangle.
+        if(scissorPoint.z > 1) return fullRect();
+        minX = Math.min(minX, scissorPoint.x); maxX = Math.max(maxX, scissorPoint.x);
+        minY = Math.min(minY, scissorPoint.y); maxY = Math.max(maxY, scissorPoint.y);
+      }
+
+  const width = innerWidth, height = innerHeight;
+  // Margin covers the spray, the approach glow and the contact shadow, none
+  // of which sit inside the vehicle's own bounding box.
+  const margin = Math.max(56, width * 0.06);
+  const rect = {
+    x0:(minX * 0.5 + 0.5) * width  - margin,
+    x1:(maxX * 0.5 + 0.5) * width  + margin,
+    y0:(minY * 0.5 + 0.5) * height - margin,
+    y1:(maxY * 0.5 + 0.5) * height + margin
+  };
+  let {x0, y0, x1, y1} = rect;
+  if(previousRect){
+    x0 = Math.min(x0, previousRect.x0); y0 = Math.min(y0, previousRect.y0);
+    x1 = Math.max(x1, previousRect.x1); y1 = Math.max(y1, previousRect.y1);
+  }
+  previousRect = rect;
+
+  x0 = Math.max(0, Math.floor(x0)); y0 = Math.max(0, Math.floor(y0));
+  x1 = Math.min(width, Math.ceil(x1)); y1 = Math.min(height, Math.ceil(y1));
+  if(x1 <= x0 || y1 <= y0) return null;
+  return {x:x0, y:y0, w:x1-x0, h:y1-y0};
+}
+
 // Kick off immediately and drop the loader once a real frame is on screen.
 // (Gating on renderer.compileAsync() stalls indefinitely under Chrome's
 //  virtual-time clock, which the headless QA capture relies on.)
 let firstFrame = true;
-tick();
+startLoop();
 
 // expose for QA
 function getRideContactPoint(){

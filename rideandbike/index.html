@@ -1,5 +1,7 @@
 <!DOCTYPE html>
-<html lang="he" dir="rtl">
+<!-- The hero owns two WebGL contexts before any script runs; the broker
+     must budget around them rather than adding a third on a phone. -->
+<html lang="he" dir="rtl" data-scene-reserved="2">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -600,7 +602,8 @@
   .care-webgl{position:relative;isolation:isolate;overflow:hidden;border:1px solid rgba(245,197,24,.25);background:radial-gradient(circle at 52% 42%,#282b31 0,#111318 50%,#050608 100%)}
   .care-webgl::before{content:"";position:absolute;z-index:2;inset:0;pointer-events:none;background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.06) 48%,transparent 60%),linear-gradient(180deg,transparent 62%,rgba(0,0,0,.62));mix-blend-mode:screen}
   .care-webgl::after{content:"WEBGL2 · LIVE PRODUCT";position:absolute;z-index:3;left:16px;bottom:14px;direction:ltr;color:rgba(255,229,104,.82);font:800 9px/1 "Rubik",sans-serif;letter-spacing:.16em}
-  .care-webgl iframe{position:absolute;z-index:1;inset:0;width:100%;height:100%;border:0;background:transparent;pointer-events:none}
+  .care-webgl [data-scene]{position:absolute;inset:0;z-index:1}
+  .care-webgl .scene-frame,.care-webgl .scene-poster{pointer-events:none}
   .care-live-badge{position:absolute;z-index:4;top:14px;right:14px;display:flex;align-items:center;gap:7px;padding:7px 10px;border:1px solid rgba(255,255,255,.12);border-radius:999px;background:rgba(5,6,8,.58);backdrop-filter:blur(10px);color:#fff;font:700 9px/1 "Rubik",sans-serif;letter-spacing:.08em}
   .care-live-badge::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 10px var(--gold);animation:livePulse 1.8s ease-in-out infinite}
   @keyframes livePulse{50%{opacity:.35;transform:scale(.72)}}
@@ -762,12 +765,17 @@
     border-radius:20px;background:rgba(3,4,6,.91);
     transform:translateY(18px) scale(.94);transform-origin:right 72%;
   }
-  .hero .ride-speech::before{
+  /* The default arrow belongs to the tethered placement only. While the
+     vehicle is out on its show lap the bubble is a standalone card, and a
+     stray rotated square floating off its corner reads as a rendering bug. */
+  .hero .ride-speech::before{display:none}
+  .hero .ride-speech.ride-anchored::before{
+    display:block;
     left:auto;right:-13px;bottom:24%;
     border:0;border-top:1px solid rgba(245,197,24,.48);
     border-right:1px solid rgba(245,197,24,.48);
   }
-  .hero .ride-speech::after{left:auto;right:-37px;bottom:calc(24% + 7px)}
+  .hero .ride-speech::after{display:none}
   .hero .ride-speech .oops{font-size:10px;margin-bottom:8px}
   .hero .ride-speech strong{font-size:clamp(22px,2vw,31px);line-height:1.08;margin-bottom:8px}
   .hero .ride-speech p{font-size:13px;line-height:1.5}
@@ -1096,7 +1104,10 @@
       <article class="care-card" data-reveal>
         <span class="care-index">01 · CHOOSE</span>
         <div class="care-art care-webgl" aria-label="אופניים חשמליים בתצוגת Three.js WebGL2 חיה">
-          <iframe id="choiceScene" src="bike-scene.embed.html?hud=0&amp;grid=0&amp;flat=1&amp;productLightning=0&amp;iso=bike&amp;cam=side&amp;t=999&amp;ride=showcase&amp;fit=1.18&amp;dpr=1.25" title="אופניים חשמליים בתלת־ממד בתצוגת אופנה מסתובבת" loading="lazy" allowtransparency="true" tabindex="-1"></iframe>
+          <div class="scene-host" data-scene
+            data-scene-src="bike-scene.embed.html?hud=0&amp;grid=0&amp;flat=1&amp;productLightning=0&amp;iso=bike&amp;cam=side&amp;t=999&amp;ride=showcase&amp;autoplay=1&amp;fit=1.18"
+            data-scene-poster="electricbike.png"
+            data-scene-title="אופניים חשמליים במודל תלת־מימד חי"></div>
           <span class="care-live-badge">תצוגה חיה</span>
         </div>
         <h3>בוחרים את הכלי</h3>
@@ -1191,6 +1202,7 @@
   </div>
 </footer>
 
+<script src="scene-loader.js" defer></script>
 <script src="catalog-data.js"></script>
 <script src="commerce.js"></script>
 <script>
@@ -1484,7 +1496,9 @@
   const menuButton = document.querySelector('.menu-toggle');
   const mobileMenu = document.querySelector('.mobile-menu');
   const sceneFrame = document.getElementById('productScene');
-  const choiceFrame = document.getElementById('choiceScene');
+  // #choiceScene is broker-managed now (see scene-loader.js): it mounts when
+  // it is near the viewport, autoplays itself, and suspends when it leaves.
+  const choiceFrame = null;
   const roadFrame = document.getElementById('roadScene');
   const heroStage = document.querySelector('.hero .stage');
   const productTabs = [...document.querySelectorAll('[data-product-tab]')];
@@ -1774,12 +1788,6 @@
     sceneLoaded = true;
     prepareRide();
   });
-  choiceFrame?.addEventListener('load',()=>{
-    choiceRideSession = makeRideSession('showcase');
-    postToFrame(choiceFrame,{
-      type:'ride-product',product:'bike',ride:'showcase',rideSessionId:choiceRideSession
-    });
-  });
   window.addEventListener('message',event=>{
     if(event.origin!==location.origin&&event.origin!=='null')return;
     const data=event.data||{};
@@ -1864,7 +1872,7 @@
         type:'ride-scene-active',active:entry.isIntersecting
       },messageOrigin));
     },{threshold:.02,rootMargin:'0px'});
-    [sceneFrame,choiceFrame,roadFrame].filter(Boolean).forEach(frame=>sceneObserver.observe(frame));
+    [sceneFrame,roadFrame].filter(Boolean).forEach(frame=>sceneObserver.observe(frame));
   }
 
   if(replayButton && sceneFrame){

@@ -28,6 +28,7 @@ import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
 import {ShaderPass} from 'three/addons/postprocessing/ShaderPass.js';
 import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
 import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
+import {createPerfGovernor} from './perf-governor.js';
 import {
   ROAD_WIDTH as SHARED_ROAD_WIDTH,
   createRoadCurve,
@@ -59,8 +60,16 @@ const query=new URLSearchParams(location.search);
 const fixedTime=Number.parseFloat(query.get('time'));
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const isMobile=()=>isHeroMobile(innerWidth,innerHeight);
-const quality=innerWidth<700?'mobile':'desktop';
-const DPR_CAP=quality==='mobile'?1.2:1.55;
+/* Same tiering decision as the product scene, taken from the device rather
+   than from the window, so a phone in landscape does not silently promote
+   itself to desktop settings. */
+const COARSE=matchMedia('(pointer: coarse)').matches;
+const LOW_END=(navigator.deviceMemory&&navigator.deviceMemory<=4)
+            ||(navigator.hardwareConcurrency&&navigator.hardwareConcurrency<=4);
+const quality=(COARSE||innerWidth<900)?'mobile':'desktop';
+const TIER=quality==='desktop'?'desktop':(LOW_END?'low':'mobile');
+const DPR_CAP=TIER==='low'?0.75:TIER==='mobile'?0.95:1.55;
+window.__sceneTier=TIER;
 
 let seed=0x4a3b2c1d;
 const random=()=>{
@@ -398,7 +407,7 @@ addMarking(ROAD_WIDTH*.5-.48,.09,0xbab9b1);
    it. Everything drifts on one current direction: this is a river, and a
    river goes somewhere.
    ═══════════════════════════════════════════════════════════════════ */
-const waterSegments=quality==='mobile'?[110,150]:[180,240];
+const waterSegments=TIER==='low'?[64,90]:TIER==='mobile'?[96,130]:[180,240];
 const waterGeo=new THREE.PlaneGeometry(150,240,waterSegments[0],waterSegments[1]);
 const waterMat=new THREE.MeshPhysicalMaterial({
   color:0x061019,roughness:.16,metalness:.20,clearcoat:1,
@@ -596,8 +605,8 @@ const moonFill=new THREE.HemisphereLight(0x536f88,0x171008,1.18);
 scene.add(moonFill);
 const coolKey=new THREE.DirectionalLight(0x91aac1,1.05);
 coolKey.position.set(-18,30,8);
-coolKey.castShadow=true;
-coolKey.shadow.mapSize.set(1024,1024);
+coolKey.castShadow=TIER==='desktop';
+coolKey.shadow.mapSize.set(TIER==='desktop'?1024:512,TIER==='desktop'?1024:512);
 coolKey.shadow.camera.left=-34;coolKey.shadow.camera.right=34;
 coolKey.shadow.camera.top=28;coolKey.shadow.camera.bottom=-16;
 coolKey.shadow.camera.near=1;coolKey.shadow.camera.far=120;
@@ -734,14 +743,19 @@ lampTimes.forEach((t,index)=>{
     const intensity=index===0?28:(index<4?54:38);
     const light=new THREE.PointLight(0xffa62a,intensity,index<3?23:19,1.72);
     light.position.copy(bulb.position);
-    if(index<2){light.castShadow=true;light.shadow.mapSize.set(512,512);}
+    if(index<2&&TIER==='desktop'){light.castShadow=true;light.shadow.mapSize.set(512,512);}
     scene.add(light);lamps.push({light,bulb,t,baseIntensity:light.intensity});
   }
   if(reflectorCount<REFLECTOR_LIMIT){
     reflectorPositions[reflectorCount].copy(bulb.position);
     // Near lamps carry the frame; far ones must not blow out at grazing angles.
-    reflectorPower[reflectorCount]=index<3?1.0:(index<6?0.78:0.5);
-    reflectorCount++;
+    // Beyond the sixth lamp the streak is a couple of dim pixels, but it
+    // costs a full anisotropic lobe per fragment. Phones stop at four.
+    const maxLamps = TIER === 'desktop' ? REFLECTOR_LIMIT : 4;
+    if(reflectorCount < maxLamps){
+      reflectorPower[reflectorCount]=index<3?1.0:(index<6?0.78:0.5);
+      reflectorCount++;
+    }
   }
 });
 
@@ -767,6 +781,8 @@ const wetUniforms={
 };
 
 const WET_CHUNK=/* glsl */`
+#define RIDE_WET_OCTAVES ${TIER==='desktop'?4:2}
+#define RIDE_RAIN_RINGS ${TIER==='desktop'?1:0}
 uniform float uWetTime,uWetFlash,uWetAmount;
 uniform vec3 uWetBolt,uWetCam;
 uniform vec3 uReflPos[${REFLECTOR_LIMIT}];
@@ -781,8 +797,11 @@ float wetNoise(vec2 p){
 }
 float wetFbm(vec2 p){
   float n=0.0,a=0.55;
-  for(int i=0;i<4;i++){n+=wetNoise(p)*a;p=p*2.03+1.7;a*=0.5;}
-  return n;
+  // Octaves are a straight multiplier on every call below, and there are a
+  // lot of calls. Two is enough to place a puddle; four only refines an edge
+  // that a phone renders across three pixels.
+  for(int i=0;i<RIDE_WET_OCTAVES;i++){n+=wetNoise(p)*a;p=p*2.03+1.7;a*=0.5;}
+  return n*(RIDE_WET_OCTAVES<4?1.28:1.0);
 }
 
 /* Where the water actually sits. Three separate things, because they look
@@ -795,8 +814,7 @@ float puddleAt(vec2 p){
   // A hard rim: water either stands here or it does not.
   return smoothstep(0.500,0.560,field);
 }
-float wetnessAt(vec2 p){
-  float pools=puddleAt(p);
+float wetnessAt(vec2 p,float pools){
   float streaks=smoothstep(0.40,0.70,wetFbm(vec2(p.x*2.6,p.y*0.22)+vec2(9.0,3.0)));
   float damp=0.09+streaks*0.26;
   return clamp(max(damp,pools),0.0,1.0);
@@ -804,7 +822,7 @@ float wetnessAt(vec2 p){
 
 /* Live surface: drifting capillary ripples plus expanding rain rings.
    Returns the slope, which is what smears and chops the reflections. */
-vec2 rippleSlope(vec2 p,float wet){
+vec2 rippleSlope(vec2 p,float wet,float pooled){
   float t=uWetTime;
   vec2 slope=vec2(0.0);
   // Fine wind-driven chop, anisotropic so the break-up runs across the road.
@@ -815,8 +833,8 @@ vec2 rippleSlope(vec2 p,float wet){
   /* Rain rings. Only standing water rings — a damp film has nothing to
      ripple — so the impacts are masked by the puddle field, and each ring
      carries a smaller trailing ring behind its front the way a real impact
-     does. */
-  float pooled=puddleAt(p);
+     does. Three ring evaluations per fragment is a desktop-only luxury. */
+#if RIDE_RAIN_RINGS
   vec2 cell=floor(p*2.2);
   for(int i=0;i<3;i++){
     vec2 c=cell+vec2(float(i)-1.0);
@@ -831,6 +849,7 @@ vec2 rippleSlope(vec2 p,float wet){
     float ring=(front+trail)*(1.0-phase)*step(0.0001,r);
     slope+=normalize(delta+1e-5)*ring*0.72*pooled;
   }
+#endif
   return slope*wet;
 }
 
@@ -850,8 +869,12 @@ const WET_APPLY=/* glsl */`
 {
   vec3 P=vWetWorld;
   vec3 V=normalize(uWetCam-P);
-  float wet=wetnessAt(P.xz)*uWetAmount;
-  vec2 slope=rippleSlope(P.xz,wet);
+  /* One evaluation of the puddle field, shared by the wetness, the ripples,
+     the mirror term and the rim. It used to be computed four times per
+     fragment, each one four octaves of noise. */
+  float pooled=puddleAt(P.xz);
+  float wet=wetnessAt(P.xz,pooled)*uWetAmount;
+  vec2 slope=rippleSlope(P.xz,wet,pooled);
   vec3 N=normalize(vec3(-slope.x,1.0,-slope.y));
   // Screen-horizontal axis on the road plane: the direction the streak must
   // stay narrow in.
@@ -861,7 +884,6 @@ const WET_APPLY=/* glsl */`
   // Grazing angles wet out harder: this is the Fresnel that makes distant
   // asphalt a mirror and the asphalt under your feet merely damp.
   float graze=pow(1.0-clamp(dot(V,vec3(0.0,1.0,0.0)),0.0,1.0),3.2);
-  float pooled=puddleAt(P.xz);
   // Standing water is a mirror; a damp film is only a sheen. Separating the
   // two is what produces the reference's patchwork of bright pools against
   // near-black asphalt instead of one evenly glossy road.
@@ -898,7 +920,7 @@ const WET_APPLY=/* glsl */`
 
   // A puddle has a visible edge: a thin dark lip of saturated asphalt just
   // outside the standing water. Without it the pools look painted on.
-  float rimBand=puddleAt(P.xz+vec2(0.06,0.04))-pooled;
+  float rimBand=pooled<0.999 ? puddleAt(P.xz+vec2(0.06,0.04))-pooled : 0.0;
   gl_FragColor.rgb*=1.0-clamp(rimBand,0.0,1.0)*0.35;
 
   gl_FragColor.rgb+=refl*mirror;
@@ -1380,13 +1402,13 @@ const hazeMat=new THREE.SpriteMaterial({
   map:hazeTexture,color:0x536978,transparent:true,opacity:.22,
   blending:THREE.AdditiveBlending,depthWrite:false
 });
-for(let i=0;i<10;i++){
+for(let i=0;i<(TIER==='desktop'?10:5);i++){
   const s=new THREE.Sprite(hazeMat.clone());
   s.position.set(-28+random()*50,2+random()*9,-35-random()*95);
   s.scale.set(22+random()*38,8+random()*16,1);scene.add(s);
 }
 
-const rainCount=quality==='mobile'?320:760;
+const rainCount=TIER==='low'?150:TIER==='mobile'?300:760;
 const rainPositions=new Float32Array(rainCount*3);
 const rainSpeed=new Float32Array(rainCount);
 for(let i=0;i<rainCount;i++){
@@ -1436,18 +1458,47 @@ function updateCamera(){
   applyHeroCamera(camera,innerWidth,innerHeight);
 }
 
+const governor=createPerfGovernor({
+  renderer, composer,
+  baseRatio:Math.min(devicePixelRatio||1,DPR_CAP),
+  targetMs:1000/60,
+  minScale:0.6,
+  enabled:TIER!=='desktop',
+  onChange:()=>resize()
+});
+
 function resize(){
   const w=innerWidth,h=innerHeight;
-  renderer.setPixelRatio(Math.min(devicePixelRatio||1,DPR_CAP));
+  governor.reapply();
   renderer.setSize(w,h,false);
   camera.aspect=w/h;
   updateCamera();
-  composer.setPixelRatio(renderer.getPixelRatio());
   composer.setSize(w,h);
   gradePass.uniforms.uResolution.value.set(w,h);
 }
 addEventListener('resize',resize,{passive:true});
 resize();
+
+function reportToHost(type){
+  if(window.parent===window)return;
+  window.parent.postMessage({type},location.origin==='null'?'*':location.origin);
+}
+let contextLost=false;
+let firstFrameSent=false;
+canvas.addEventListener('webglcontextlost',event=>{
+  // Preventing the default is what makes the context restorable at all.
+  event.preventDefault();
+  contextLost=true;
+  renderer.setAnimationLoop(null);
+  reportToHost('scene-context-lost');
+},false);
+canvas.addEventListener('webglcontextrestored',()=>{
+  contextLost=false;
+  firstFrameSent=false;
+  reportToHost('scene-context-restored');
+  resize();
+  renderer.setAnimationLoop(draw);
+},false);
 
 const clock=new THREE.Clock();
 let sceneActive=true;
@@ -1550,6 +1601,9 @@ function draw(){
 
   if(!reducedMotion) updateRain(dt);
   water.material.roughness=.15+Math.sin(elapsed*.23)*.012;
+  if(!firstFrameSent){ firstFrameSent=true; reportToHost('scene-first-frame'); }
+  // Resolution, not frame rate, is what gives when this device runs short.
+  governor.sample();
 
   /* The product rides in a separate WebGL2 layer that cannot see this scene's
      lights. Publishing the strike energy lets the hero light the vehicle with
