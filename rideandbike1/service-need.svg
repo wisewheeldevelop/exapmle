@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 768" role="img" aria-labelledby="title desc">
+  <title id="title">בחירת כלי מתוך קטלוג</title>
+  <desc id="desc">ממשק קטלוג פרימיום עם אופניים חשמליים, מסננים וסמן בחירה</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#272b33"/><stop offset=".52" stop-color="#101217"/><stop offset="1" stop-color="#040506"/></linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff4a6"/><stop offset=".24" stop-color="#ffe05a"/><stop offset=".62" stop-color="#f5c518"/><stop offset="1" stop-color="#8f5100"/></linearGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#747b87"/><stop offset=".24" stop-color="#262a31"/><stop offset=".72" stop-color="#090a0d"/><stop offset="1" stop-color="#444a54"/></linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff" stop-opacity=".15"/><stop offset=".45" stop-color="#fff" stop-opacity=".025"/><stop offset="1" stop-color="#000" stop-opacity=".18"/></linearGradient>
+    <radialGradient id="halo"><stop stop-color="#f5c518" stop-opacity=".22"/><stop offset="1" stop-color="#f5c518" stop-opacity="0"/></radialGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="190%"><feDropShadow dy="28" stdDeviation="24" flood-color="#000" flood-opacity=".62"/><feDropShadow dy="3" stdDeviation="5" flood-color="#f5c518" flood-opacity=".14"/></filter>
+    <filter id="glow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="2" seed="14" result="n"/><feComponentTransfer><feFuncA type="table" tableValues="0 0 .045"/></feComponentTransfer><feBlend in="SourceGraphic" mode="soft-light"/></filter>
+    <clipPath id="screen"><rect x="160" y="104" width="704" height="540" rx="48"/></clipPath>
+  </defs>
+  <style>
+    .panel{transform-box:fill-box;transform-origin:center;animation:float 6s cubic-bezier(.4,0,.2,1) infinite}.wheel{transform-box:fill-box;transform-origin:center;animation:roll 10s linear infinite}.cursor{transform-box:fill-box;transform-origin:center;animation:select 4.8s ease-in-out infinite}.scan{animation:scan 5.4s ease-in-out infinite}.pulse{transform-box:fill-box;transform-origin:center;animation:pulse 2.4s ease-in-out infinite}
+    @keyframes float{50%{transform:translateY(-10px)}}@keyframes roll{to{transform:rotate(360deg)}}@keyframes select{0%,30%,100%{transform:translate(0,0) scale(1)}50%,72%{transform:translate(-122px,116px) scale(.9)}}@keyframes scan{0%,16%,100%{opacity:0;transform:translateX(-360px)}45%,60%{opacity:.55;transform:translateX(460px)}}@keyframes pulse{50%{opacity:.45;transform:scale(.82)}}@media(prefers-reduced-motion:reduce){*{animation:none!important}}
+  </style>
+  <ellipse cx="512" cy="688" rx="330" ry="38" fill="#000" opacity=".45" filter="url(#shadow)"/>
+  <circle cx="520" cy="365" r="320" fill="url(#halo)"/>
+  <g class="panel" filter="url(#shadow)">
+    <rect x="142" y="86" width="740" height="576" rx="62" fill="url(#bg)" stroke="url(#gold)" stroke-width="8" filter="url(#grain)"/>
+    <rect x="160" y="104" width="704" height="540" rx="48" fill="#090b0f" stroke="#fff" stroke-opacity=".08"/>
+    <g clip-path="url(#screen)">
+      <path d="M160 194h704" stroke="#fff" stroke-opacity=".08"/><circle cx="201" cy="149" r="8" fill="#f5c518"/><circle cx="229" cy="149" r="8" fill="#fff" opacity=".16"/><circle cx="257" cy="149" r="8" fill="#fff" opacity=".1"/>
+      <rect x="625" y="132" width="190" height="34" rx="17" fill="#fff" opacity=".075"/><rect x="653" y="144" width="126" height="10" rx="5" fill="#fff" opacity=".18"/>
+      <rect x="188" y="226" width="148" height="344" rx="28" fill="#fff" opacity=".035" stroke="#fff" stroke-opacity=".08"/>
+      <g fill="#fff" opacity=".17"><rect x="214" y="257" width="82" height="9" rx="5"/><rect x="214" y="335" width="96" height="9" rx="5"/><rect x="214" y="413" width="70" height="9" rx="5"/><rect x="214" y="491" width="91" height="9" rx="5"/></g>
+      <g stroke="#f5c518" stroke-width="5" stroke-linecap="round"><path d="M214 286h96"/><path d="M214 364h96"/><path d="M214 442h96"/><path d="M214 520h96"/></g>
+      <g fill="url(#gold)"><circle cx="251" cy="286" r="11"/><circle cx="282" cy="364" r="11"/><circle cx="233" cy="442" r="11"/><circle cx="270" cy="520" r="11"/></g>
+      <rect x="366" y="226" width="468" height="344" rx="30" fill="url(#glass)" stroke="#fff" stroke-opacity=".08"/>
+      <circle cx="601" cy="403" r="172" fill="none" stroke="#f5c518" stroke-opacity=".11" stroke-width="2"/><circle cx="601" cy="403" r="127" fill="#f5c518" opacity=".035"/>
+      <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <g class="wheel"><circle cx="475" cy="456" r="78" stroke="url(#metal)" stroke-width="18"/><circle cx="475" cy="456" r="58" stroke="#f5c518" stroke-opacity=".72" stroke-width="4" stroke-dasharray="10 10"/><circle cx="475" cy="456" r="10" fill="url(#gold)" stroke="none"/><path d="M475 398v116M417 456h116M434 415l82 82M516 415l-82 82" stroke="#fff" stroke-opacity=".18" stroke-width="3"/></g>
+        <g class="wheel"><circle cx="720" cy="456" r="78" stroke="url(#metal)" stroke-width="18"/><circle cx="720" cy="456" r="58" stroke="#f5c518" stroke-opacity=".72" stroke-width="4" stroke-dasharray="10 10"/><circle cx="720" cy="456" r="10" fill="url(#gold)" stroke="none"/><path d="M720 398v116M662 456h116M679 415l82 82M761 415l-82 82" stroke="#fff" stroke-opacity=".18" stroke-width="3"/></g>
+        <path d="M475 456l73-126 91 126H475l62-96 103 3 80 93M548 330l-27-38M640 363l25-86M636 278h62M521 292h-48" stroke="url(#gold)" stroke-width="15"/>
+        <path d="M548 330l74 20-38 50" stroke="#fff" stroke-opacity=".45" stroke-width="5"/>
+      </g>
+      <rect x="470" y="252" width="262" height="286" rx="22" fill="none" stroke="url(#gold)" stroke-width="4" stroke-dasharray="14 11" opacity=".74"/>
+      <path class="scan" d="M214 105h92l318 540H532Z" fill="#fff" opacity="0"/>
+    </g>
+  </g>
+  <g class="cursor" filter="url(#glow)"><path d="M824 250l-8 122 34-24 25 53 29-14-26-52 41-5Z" fill="url(#gold)" stroke="#fff8bd" stroke-width="4"/><circle class="pulse" cx="842" cy="330" r="31" fill="none" stroke="#f5c518" stroke-width="5"/></g>
+</svg>

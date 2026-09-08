@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='13' fill='%23f5c518'/></svg>" />
+  <title>פרטי הזמנה · RIDE AND BIKE</title>
+  <meta name="description" content="סיכום הזמנה, בחירת משלוח או איסוף עצמי ופרטי קשר ב-RIDE AND BIKE ראשון לציון.">
+  <meta name="theme-color" content="#08090b">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800&family=Rubik:wght@700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="store.css">
+  <link rel="stylesheet" href="commerce.css">
+</head>
+<body>
+  <header class="store-nav"><div class="shell nav-inner">
+    <a class="store-brand" href="index.html"><i></i>RIDE AND <b>BIKE</b></a>
+    <ul class="store-links"><li><a href="index.html">בית</a></li><li><a href="electric-bikes.html">אופניים</a></li><li><a href="electric-scooters.html">קורקינטים</a></li><li><a href="service.html">איך מזמינים</a></li></ul>
+    <a class="nav-visit" href="index.html#shop">המשך קנייה</a>
+  </div></header>
+  <main class="checkout-page" id="checkoutRoot">
+    <div class="checkout-shell">
+      <div class="checkout-head"><div><span class="kicker">CHECKOUT · RIDE AND BIKE</span><h1>מסיימים<br>את ההזמנה.</h1></div><p>בחרו משלוח או איסוף עצמי, השאירו פרטים ואנחנו מאמתים מלאי, גרסה ומועד מסירה לפני החיוב.</p></div>
+      <div id="checkoutFormWrap">
+        <div class="checkout-grid">
+          <form class="checkout-card" id="checkoutForm">
+            <h2>פרטי קשר ומסירה</h2>
+            <div class="checkout-fields">
+              <div class="checkout-field"><label for="customerName">שם מלא</label><input id="customerName" name="name" autocomplete="name" required></div>
+              <div class="checkout-field"><label for="customerPhone">טלפון</label><input id="customerPhone" name="phone" type="tel" autocomplete="tel" inputmode="tel" required></div>
+              <div class="checkout-field full"><label for="customerEmail">אימייל לאישור ההזמנה</label><input id="customerEmail" name="email" type="email" autocomplete="email" required></div>
+            </div>
+            <h2 style="margin-top:30px">איך מקבלים?</h2>
+            <div class="checkout-methods">
+              <label class="checkout-method"><input type="radio" name="checkout-delivery" value="pickup"><span><strong>איסוף עצמי</strong><small>מרכז ראשון לציון · ללא עלות</small></span></label>
+              <label class="checkout-method"><input type="radio" name="checkout-delivery" value="delivery"><span><strong>משלוח עד הבית</strong><small>חינם בקנייה מעל ₪2,500</small></span></label>
+            </div>
+            <div class="checkout-fields" id="addressFields">
+              <div class="checkout-field full"><label for="street">רחוב ומספר</label><input id="street" name="street" autocomplete="street-address"></div>
+              <div class="checkout-field"><label for="city">עיר</label><input id="city" name="city" autocomplete="address-level2"></div>
+              <div class="checkout-field"><label for="floor">דירה / קומה</label><input id="floor" name="floor"></div>
+            </div>
+            <div class="checkout-field full" style="margin-top:16px"><label for="orderNote">הערה להזמנה</label><textarea id="orderNote" name="note" placeholder="צבע מועדף, שעת מסירה או כל דבר שחשוב שנדע"></textarea></div>
+            <h2 style="margin-top:30px">אופן תשלום</h2>
+            <div class="checkout-methods">
+              <label class="checkout-method"><input type="radio" name="payment" value="secure" checked><span><strong>תשלום מאובטח אונליין</strong><small>קישור סליקה נשלח לאחר אימות המלאי</small></span></label>
+              <label class="checkout-method"><input type="radio" name="payment" value="pickup"><span><strong>תשלום באיסוף</strong><small>זמין בבחירת איסוף עצמי</small></span></label>
+            </div>
+            <button class="checkout-submit" type="submit">שליחת ההזמנה לאישור</button>
+            <p class="checkout-note">זהו אתר סטטי בפיתוח: פרטי כרטיס אינם נאספים כאן. חיוב אמיתי יתבצע רק לאחר חיבור ספק סליקה מאובטח ואימות המלאי.</p>
+          </form>
+          <aside class="checkout-card checkout-summary" aria-label="סיכום ההזמנה"><h2>סיכום</h2><div id="checkoutSummaryLines"></div><div class="checkout-summary-total"><span>סה״כ</span><strong id="checkoutTotal"></strong></div></aside>
+        </div>
+      </div>
+      <section class="checkout-card checkout-confirmation" id="checkoutConfirmation" aria-live="polite"><div class="check">✓</div><h2>בקשת ההזמנה התקבלה.</h2><p>מספר בקשה: <strong id="orderNumber"></strong><br>נחזור אליכם לאימות המלאי, הגרסה, המסירה והתשלום.</p><a href="index.html">חזרה לדף הבית</a></section>
+    </div>
+  </main>
+  <script src="catalog-data.js"></script>
+  <script src="commerce.js"></script>
+</body>
+</html>

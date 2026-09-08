@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 768" role="img" aria-labelledby="title desc">
+  <title id="title">התאמה והוספה לסל</title>
+  <desc id="desc">סל קניות תלת־ממדי עם סוללה, קסדה ואביזרי רכיבה</desc>
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff5ac"/><stop offset=".23" stop-color="#ffe15d"/><stop offset=".62" stop-color="#f5c518"/><stop offset="1" stop-color="#8a4a00"/></linearGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#5f6672"/><stop offset=".25" stop-color="#262a31"/><stop offset=".72" stop-color="#08090c"/><stop offset="1" stop-color="#343942"/></linearGradient>
+    <linearGradient id="side" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#171a20"/><stop offset="1" stop-color="#020304"/></linearGradient>
+    <linearGradient id="glass"><stop stop-color="#fff" stop-opacity=".7"/><stop offset=".45" stop-color="#fff" stop-opacity=".1"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <radialGradient id="halo"><stop stop-color="#f5c518" stop-opacity=".2"/><stop offset="1" stop-color="#f5c518" stop-opacity="0"/></radialGradient>
+    <filter id="shadow" x="-35%" y="-35%" width="170%" height="200%"><feDropShadow dy="30" stdDeviation="25" flood-color="#000" flood-opacity=".62"/><feDropShadow dy="4" stdDeviation="6" flood-color="#f5c518" flood-opacity=".14"/></filter>
+    <filter id="blur"><feGaussianBlur stdDeviation="18"/></filter>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".74" numOctaves="2" seed="28" result="n"/><feComponentTransfer><feFuncA type="table" tableValues="0 0 .045"/></feComponentTransfer><feBlend in="SourceGraphic" mode="soft-light"/></filter>
+    <clipPath id="basket"><path d="M250 293h570l-69 286c-10 42-48 72-92 72H397c-44 0-82-30-92-72Z"/></clipPath>
+  </defs>
+  <style>
+    .cart{transform-box:fill-box;transform-origin:center;animation:float 5.8s ease-in-out infinite}.wheel{transform-box:fill-box;transform-origin:center;animation:roll 4.2s linear infinite}.battery{transform-box:fill-box;transform-origin:center;animation:battery 3.4s ease-in-out infinite}.helmet{transform-box:fill-box;transform-origin:bottom;animation:helmet 4.8s ease-in-out infinite}.gleam{animation:gleam 6.4s ease-in-out infinite}.plus{transform-box:fill-box;transform-origin:center;animation:plus 2.8s ease-in-out infinite}
+    @keyframes float{50%{transform:translateY(-11px)}}@keyframes roll{to{transform:rotate(360deg)}}@keyframes battery{50%{transform:translateY(-8px);filter:brightness(1.18)}}@keyframes helmet{50%{transform:rotate(2deg) translateY(-6px)}}@keyframes gleam{0%,18%,100%{opacity:0;transform:translateX(-300px)}42%,56%{opacity:.52;transform:translateX(430px)}}@keyframes plus{50%{transform:scale(1.12) rotate(90deg);filter:brightness(1.25)}}@media(prefers-reduced-motion:reduce){*{animation:none!important}}
+  </style>
+  <circle cx="526" cy="372" r="330" fill="url(#halo)"/><ellipse cx="520" cy="690" rx="318" ry="39" fill="#000" opacity=".42" filter="url(#blur)"/>
+  <g class="cart" filter="url(#shadow)">
+    <path d="M176 161h80c32 0 59 22 66 53l18 79h480" fill="none" stroke="url(#gold)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M250 293h570l-69 286c-10 42-48 72-92 72H397c-44 0-82-30-92-72Z" fill="url(#metal)" stroke="#fff" stroke-opacity=".1" stroke-width="4" filter="url(#grain)"/>
+    <path d="M710 293h110l-69 286c-10 42-48 72-92 72h-35c35-20 53-47 64-91Z" fill="url(#side)" opacity=".68"/>
+    <g clip-path="url(#basket)">
+      <path d="M269 354h523M282 414h496M297 474h467M311 534h439" stroke="#fff" stroke-opacity=".12" stroke-width="5"/>
+      <path d="M345 303l58 346M448 293l38 358M555 293l11 358M662 293l-17 358M769 293l-47 331" stroke="#fff" stroke-opacity=".1" stroke-width="4"/>
+      <g class="helmet" transform="translate(354 285)"><path d="M0 155C8 60 78 0 173 0c86 0 153 51 174 136l-91 8c-17-40-50-62-97-62-53 0-90 25-105 73Z" fill="url(#gold)"/><path d="M36 119c26-64 77-96 149-96 54 0 102 21 133 60-58-17-109-13-158 12-35 17-59 37-73 61Z" fill="#fff" opacity=".24"/><path d="M236 130h129v32H224Z" fill="#08090c"/></g>
+      <g class="battery" transform="translate(609 326)"><rect width="122" height="220" rx="26" fill="#0b0d11" stroke="url(#gold)" stroke-width="8"/><rect x="38" y="-14" width="46" height="19" rx="7" fill="url(#gold)"/><path d="M71 42l-34 70h37l-22 66 55-83H72l25-53Z" fill="url(#gold)"/><rect x="24" y="188" width="74" height="9" rx="5" fill="#fff" opacity=".15"/></g>
+      <path class="gleam" d="M180 258h104l336 433H492Z" fill="url(#glass)"/>
+    </g>
+    <g class="wheel" transform="translate(407 674)"><circle r="67" fill="#050609" stroke="url(#metal)" stroke-width="16"/><circle r="34" fill="url(#gold)"/><circle r="13" fill="#15181d"/><path d="M0-32V32M-32 0h64M-23-23l46 46M23-23l-46 46" stroke="#fff" stroke-opacity=".24" stroke-width="4"/></g>
+    <g class="wheel" transform="translate(692 674)"><circle r="67" fill="#050609" stroke="url(#metal)" stroke-width="16"/><circle r="34" fill="url(#gold)"/><circle r="13" fill="#15181d"/><path d="M0-32V32M-32 0h64M-23-23l46 46M23-23l-46 46" stroke="#fff" stroke-opacity=".24" stroke-width="4"/></g>
+  </g>
+  <g class="plus" transform="translate(829 164)" filter="url(#shadow)"><circle r="72" fill="#08090c" stroke="url(#gold)" stroke-width="8"/><path d="M-29 0h58M0-29v58" stroke="url(#gold)" stroke-width="13" stroke-linecap="round"/></g>
+</svg>
